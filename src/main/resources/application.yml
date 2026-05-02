@@ -1,8 +1,10 @@
 spring:
+  profiles:
+    include: local
   datasource:
     url: jdbc:mysql://localhost:3306/kbo_stats?useSSL=false&serverTimezone=Asia/Seoul&characterEncoding=UTF-8&allowPublicKeyRetrieval=true
     username: root
-    password: "*khacademy!"
+    password: ${DB_PASSWORD:your_password}
     driver-class-name: com.mysql.cj.jdbc.Driver
 
   thymeleaf:
