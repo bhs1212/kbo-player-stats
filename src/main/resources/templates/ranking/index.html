@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org"
+      th:replace="~{layout/base :: base(
+          title='랭킹',
+          content=~{::main-content},
+          extraHead=~{},
+          extraScript=~{})}">
+<head><title>랭킹</title></head>
+<body>
+<th:block th:fragment="main-content">
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h4 class="mb-0"><i class="bi bi-trophy-fill text-warning"></i> KBO 랭킹</h4>
+    <div class="d-flex align-items-center gap-2">
+        <label class="small text-muted">상위</label>
+        <select onchange="location.href='/ranking?limit='+this.value" class="form-select form-select-sm w-auto">
+            <option th:each="n : ${#numbers.sequence(10, 50, 10)}"
+                    th:value="${n}" th:text="${n + '명'}"
+                    th:selected="${n == limit}"></option>
+        </select>
+    </div>
+</div>
+
+<ul class="nav nav-tabs mb-3" id="rankingTab">
+    <li class="nav-item">
+        <a class="nav-link active" data-bs-toggle="tab" href="#batting">
+            <i class="bi bi-person-fill text-primary"></i> 타율
+        </a>
+    </li>
+    <li class="nav-item">
+        <a class="nav-link" data-bs-toggle="tab" href="#homerun">
+            <i class="bi bi-circle-fill text-warning"></i> 홈런
+        </a>
+    </li>
+    <li class="nav-item">
+        <a class="nav-link" data-bs-toggle="tab" href="#era">
+            <i class="bi bi-person-fill text-danger"></i> 방어율
+        </a>
+    </li>
+    <li class="nav-item">
+        <a class="nav-link" data-bs-toggle="tab" href="#wins">
+            <i class="bi bi-star-fill text-success"></i> 승리
+        </a>
+    </li>
+</ul>
+
+<div class="tab-content">
+
+    <!-- 타율 랭킹 -->
+    <div class="tab-pane fade show active" id="batting">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle">
+                <thead>
+                    <tr><th width="60">순위</th><th>선수명</th><th>팀</th><th>포지션</th>
+                        <th>타율</th><th>홈런</th><th>안타</th><th>타점</th><th>경기</th></tr>
+                </thead>
+                <tbody>
+                <tr th:each="player, stat : ${battingRanking}">
+                    <td>
+                        <span class="rank-num"
+                              th:classappend="${stat.index == 0 ? 'gold' : stat.index == 1 ? 'silver' : stat.index == 2 ? 'bronze' : ''}"
+                              th:text="${stat.index + 1}"></span>
+                    </td>
+                    <td><a th:href="@{/players/{id}(id=${player.id})}"
+                           class="fw-bold text-decoration-none" th:text="${player.name}"></a></td>
+                    <td th:text="${player.team}"></td>
+                    <td th:text="${player.position}"></td>
+                    <td><strong th:text="${#numbers.formatDecimal(player.battingAvg, 1, 3)}"></strong></td>
+                    <td th:text="${player.homeRuns}"></td>
+                    <td th:text="${player.hits}"></td>
+                    <td th:text="${player.rbi}"></td>
+                    <td th:text="${player.games}"></td>
+                </tr>
+                <tr th:if="${battingRanking.isEmpty()}">
+                    <td colspan="9" class="text-center text-muted">데이터가 없습니다.</td>
+                </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- 홈런 랭킹 -->
+    <div class="tab-pane fade" id="homerun">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle">
+                <thead>
+                    <tr><th width="60">순위</th><th>선수명</th><th>팀</th><th>포지션</th>
+                        <th>홈런</th><th>타율</th><th>타점</th><th>경기</th></tr>
+                </thead>
+                <tbody>
+                <tr th:each="player, stat : ${homeRunRanking}">
+                    <td>
+                        <span class="rank-num"
+                              th:classappend="${stat.index == 0 ? 'gold' : stat.index == 1 ? 'silver' : stat.index == 2 ? 'bronze' : ''}"
+                              th:text="${stat.index + 1}"></span>
+                    </td>
+                    <td><a th:href="@{/players/{id}(id=${player.id})}"
+                           class="fw-bold text-decoration-none" th:text="${player.name}"></a></td>
+                    <td th:text="${player.team}"></td>
+                    <td th:text="${player.position}"></td>
+                    <td><strong class="text-warning" th:text="${player.homeRuns}"></strong></td>
+                    <td th:text="${player.battingAvg != null ? #numbers.formatDecimal(player.battingAvg, 1, 3) : '-'}"></td>
+                    <td th:text="${player.rbi}"></td>
+                    <td th:text="${player.games}"></td>
+                </tr>
+                <tr th:if="${homeRunRanking.isEmpty()}">
+                    <td colspan="8" class="text-center text-muted">데이터가 없습니다.</td>
+                </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- 방어율 랭킹 -->
+    <div class="tab-pane fade" id="era">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle">
+                <thead>
+                    <tr><th width="60">순위</th><th>선수명</th><th>팀</th><th>포지션</th>
+                        <th>방어율</th><th>승</th><th>경기</th></tr>
+                </thead>
+                <tbody>
+                <tr th:each="player, stat : ${eraRanking}">
+                    <td>
+                        <span class="rank-num"
+                              th:classappend="${stat.index == 0 ? 'gold' : stat.index == 1 ? 'silver' : stat.index == 2 ? 'bronze' : ''}"
+                              th:text="${stat.index + 1}"></span>
+                    </td>
+                    <td><a th:href="@{/players/{id}(id=${player.id})}"
+                           class="fw-bold text-decoration-none" th:text="${player.name}"></a></td>
+                    <td th:text="${player.team}"></td>
+                    <td th:text="${player.position}"></td>
+                    <td><strong class="text-danger" th:text="${#numbers.formatDecimal(player.era, 1, 2)}"></strong></td>
+                    <td th:text="${player.wins}"></td>
+                    <td th:text="${player.games}"></td>
+                </tr>
+                <tr th:if="${eraRanking.isEmpty()}">
+                    <td colspan="7" class="text-center text-muted">데이터가 없습니다.</td>
+                </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- 승리 랭킹 -->
+    <div class="tab-pane fade" id="wins">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle">
+                <thead>
+                    <tr><th width="60">순위</th><th>선수명</th><th>팀</th><th>포지션</th>
+                        <th>승</th><th>방어율</th><th>경기</th></tr>
+                </thead>
+                <tbody>
+                <tr th:each="player, stat : ${winsRanking}">
+                    <td>
+                        <span class="rank-num"
+                              th:classappend="${stat.index == 0 ? 'gold' : stat.index == 1 ? 'silver' : stat.index == 2 ? 'bronze' : ''}"
+                              th:text="${stat.index + 1}"></span>
+                    </td>
+                    <td><a th:href="@{/players/{id}(id=${player.id})}"
+                           class="fw-bold text-decoration-none" th:text="${player.name}"></a></td>
+                    <td th:text="${player.team}"></td>
+                    <td th:text="${player.position}"></td>
+                    <td><strong class="text-success" th:text="${player.wins}"></strong></td>
+                    <td th:text="${player.era != null ? #numbers.formatDecimal(player.era, 1, 2) : '-'}"></td>
+                    <td th:text="${player.games}"></td>
+                </tr>
+                <tr th:if="${winsRanking.isEmpty()}">
+                    <td colspan="7" class="text-center text-muted">데이터가 없습니다.</td>
+                </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+</div>
+</th:block>
+</body>
+</html>

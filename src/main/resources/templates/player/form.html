@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org"
+      th:replace="~{layout/base :: base(
+          title=${mode == 'create' ? '선수 등록' : '선수 수정'},
+          content=~{::main-content},
+          extraHead=~{::extra-head},
+          extraScript=~{::extra-script})}">
+<head>
+    <title>선수 폼</title>
+    <th:block th:fragment="extra-head"></th:block>
+</head>
+<body>
+<th:block th:fragment="main-content">
+
+<div class="row justify-content-center">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="bi bi-person-plus-fill" th:if="${mode == 'create'}"></i>
+                    <i class="bi bi-pencil-fill" th:if="${mode == 'edit'}"></i>
+                    <span th:text="${mode == 'create' ? ' 선수 등록' : ' 선수 수정'}"></span>
+                </h5>
+            </div>
+            <div class="card-body">
+
+                <form th:action="${mode == 'create' ? '/players' : '/players/' + form.id}"
+                      method="post" th:object="${form}" novalidate>
+
+                    <!-- 기본 정보 섹션 -->
+                    <h6 class="text-muted border-bottom pb-2 mb-3">기본 정보</h6>
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-4">
+                            <label class="form-label fw-semibold">선수명 <span class="text-danger">*</span></label>
+                            <input type="text" th:field="*{name}" class="form-control"
+                                   th:classappend="${#fields.hasErrors('name')} ? 'is-invalid'" placeholder="홍길동">
+                            <div class="invalid-feedback" th:errors="*{name}"></div>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-semibold">팀 <span class="text-danger">*</span></label>
+                            <input type="text" th:field="*{team}" class="form-control"
+                                   th:classappend="${#fields.hasErrors('team')} ? 'is-invalid'" placeholder="KIA 타이거즈">
+                            <div class="invalid-feedback" th:errors="*{team}"></div>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-semibold">포지션 <span class="text-danger">*</span></label>
+                            <input type="text" th:field="*{position}" class="form-control"
+                                   th:classappend="${#fields.hasErrors('position')} ? 'is-invalid'" placeholder="1루수">
+                            <div class="invalid-feedback" th:errors="*{position}"></div>
+                        </div>
+                    </div>
+
+                    <div class="mb-4">
+                        <label class="form-label fw-semibold">선수 구분 <span class="text-danger">*</span></label>
+                        <div class="d-flex gap-3">
+                            <div th:each="pt : ${playerTypes}" class="form-check">
+                                <input class="form-check-input" type="radio"
+                                       th:field="*{playerType}"
+                                       th:value="${pt.name()}"
+                                       th:id="${'type_' + pt.name()}"
+                                       onchange="toggleFields(this.value)">
+                                <label class="form-check-label"
+                                       th:for="${'type_' + pt.name()}"
+                                       th:text="${pt.displayName}"></label>
+                            </div>
+                        </div>
+                        <div class="invalid-feedback d-block" th:errors="*{playerType}"></div>
+                    </div>
+
+                    <!-- 타자 기록 -->
+                    <div id="batter-fields">
+                        <h6 class="text-muted border-bottom pb-2 mb-3">
+                            <i class="bi bi-person-fill text-primary"></i> 타자 기록
+                        </h6>
+                        <div class="row g-3 mb-3">
+                            <div class="col-md-3">
+                                <label class="form-label">타율</label>
+                                <input type="number" step="0.001" min="0" max="1"
+                                       th:field="*{battingAvg}" class="form-control" placeholder="0.300">
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label">홈런</label>
+                                <input type="number" min="0" th:field="*{homeRuns}"
+                                       class="form-control" placeholder="20">
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label">안타</label>
+                                <input type="number" min="0" th:field="*{hits}"
+                                       class="form-control" placeholder="120">
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label">타점</label>
+                                <input type="number" min="0" th:field="*{rbi}"
+                                       class="form-control" placeholder="80">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 투수 기록 -->
+                    <div id="pitcher-fields" style="display:none;">
+                        <h6 class="text-muted border-bottom pb-2 mb-3">
+                            <i class="bi bi-person-fill text-danger"></i> 투수 기록
+                        </h6>
+                        <div class="row g-3 mb-3">
+                            <div class="col-md-4">
+                                <label class="form-label">방어율 (ERA)</label>
+                                <input type="number" step="0.01" min="0"
+                                       th:field="*{era}" class="form-control" placeholder="3.50">
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label">승</label>
+                                <input type="number" min="0" th:field="*{wins}"
+                                       class="form-control" placeholder="10">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 공통 -->
+                    <div class="row g-3 mb-4">
+                        <div class="col-md-3">
+                            <label class="form-label">경기수</label>
+                            <input type="number" min="0" th:field="*{games}"
+                                   class="form-control" placeholder="100">
+                        </div>
+                    </div>
+
+                    <div class="d-flex gap-2">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="bi bi-check-lg"></i>
+                            <span th:text="${mode == 'create' ? '등록' : '수정'}"></span>
+                        </button>
+                        <a th:href="${mode == 'create' ? '/players' : '/players/' + form.id}"
+                           class="btn btn-outline-secondary">취소</a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+</th:block>
+
+<th:block th:fragment="extra-script">
+<script th:inline="javascript">
+    const currentType = /*[[${form.playerType}]]*/ null;
+
+    function toggleFields(type) {
+        const batter  = document.getElementById('batter-fields');
+        const pitcher = document.getElementById('pitcher-fields');
+        if (type === 'BATTER') {
+            batter.style.display  = 'block';
+            pitcher.style.display = 'none';
+        } else if (type === 'PITCHER') {
+            batter.style.display  = 'none';
+            pitcher.style.display = 'block';
+        }
+    }
+
+    // 페이지 로드 시 현재 값 적용
+    if (currentType) {
+        toggleFields(currentType.toString());
+    }
+</script>
+</th:block>
+
+</body>
+</html>

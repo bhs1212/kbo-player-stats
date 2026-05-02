@@ -1,0 +1,179 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.kbo.stats.mapper.PlayerMapper">
+
+    <resultMap id="PlayerResultMap" type="com.kbo.stats.domain.Player">
+        <id     property="id"         column="id"/>
+        <result property="name"       column="name"/>
+        <result property="team"       column="team"/>
+        <result property="position"   column="position"/>
+        <result property="playerType" column="player_type"
+                typeHandler="org.apache.ibatis.type.EnumTypeHandler"/>
+        <result property="battingAvg" column="batting_avg"/>
+        <result property="homeRuns"   column="home_runs"/>
+        <result property="hits"       column="hits"/>
+        <result property="rbi"        column="rbi"/>
+        <result property="era"        column="era"/>
+        <result property="wins"       column="wins"/>
+        <result property="games"      column="games"/>
+        <result property="createdAt"  column="created_at"/>
+        <result property="updatedAt"  column="updated_at"/>
+    </resultMap>
+
+    <sql id="selectColumns">
+        id, name, team, position, player_type,
+        batting_avg, home_runs, hits, rbi,
+        era, wins, games,
+        created_at, updated_at
+    </sql>
+
+    <sql id="searchWhere">
+        <where>
+            <if test="name != null and name != ''">
+                AND name LIKE CONCAT('%', #{name}, '%')
+            </if>
+            <if test="team != null and team != ''">
+                AND team = #{team}
+            </if>
+            <if test="position != null and position != ''">
+                AND position LIKE CONCAT('%', #{position}, '%')
+            </if>
+            <if test="playerType != null">
+                AND player_type = #{playerType}
+            </if>
+        </where>
+    </sql>
+
+    <!-- 전체 목록 -->
+    <select id="findAll" parameterType="com.kbo.stats.dto.PlayerSearchDto"
+            resultMap="PlayerResultMap">
+        SELECT <include refid="selectColumns"/>
+        FROM player
+        <include refid="searchWhere"/>
+        ORDER BY team, name
+        LIMIT #{size} OFFSET #{offset}
+    </select>
+
+    <!-- 전체 카운트 -->
+    <select id="countAll" parameterType="com.kbo.stats.dto.PlayerSearchDto"
+            resultType="long">
+        SELECT COUNT(*)
+        FROM player
+        <include refid="searchWhere"/>
+    </select>
+
+    <!-- 단건 조회 -->
+    <select id="findById" resultMap="PlayerResultMap">
+        SELECT <include refid="selectColumns"/>
+        FROM player
+        WHERE id = #{id}
+    </select>
+
+    <!-- 이름+팀 조회 -->
+    <select id="findByNameAndTeam" resultMap="PlayerResultMap">
+        SELECT <include refid="selectColumns"/>
+        FROM player
+        WHERE name = #{name}
+          AND team = #{team}
+        LIMIT 1
+    </select>
+
+    <!-- 등록 -->
+    <insert id="insert" parameterType="com.kbo.stats.domain.Player"
+            useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO player (name, team, position, player_type,
+                            batting_avg, home_runs, hits, rbi,
+                            era, wins, games)
+        VALUES (#{name}, #{team}, #{position}, #{playerType},
+                #{battingAvg}, #{homeRuns}, #{hits}, #{rbi},
+                #{era}, #{wins}, #{games})
+    </insert>
+
+    <!-- 수정 -->
+    <update id="update" parameterType="com.kbo.stats.domain.Player">
+        UPDATE player
+        SET name        = #{name},
+            team        = #{team},
+            position    = #{position},
+            player_type = #{playerType},
+            batting_avg = #{battingAvg},
+            home_runs   = #{homeRuns},
+            hits        = #{hits},
+            rbi         = #{rbi},
+            era         = #{era},
+            wins        = #{wins},
+            games       = #{games},
+            updated_at  = NOW()
+        WHERE id = #{id}
+    </update>
+
+    <!-- 삭제 -->
+    <delete id="deleteById">
+        DELETE FROM player WHERE id = #{id}
+    </delete>
+
+    <!-- 타율 랭킹 -->
+    <select id="findBattingRanking" resultMap="PlayerResultMap">
+        SELECT <include refid="selectColumns"/>
+        FROM player
+        WHERE player_type = 'BATTER'
+          AND batting_avg IS NOT NULL
+          AND games >= 10
+        ORDER BY batting_avg DESC
+        LIMIT #{limit}
+    </select>
+
+    <!-- 홈런 랭킹 -->
+    <select id="findHomeRunRanking" resultMap="PlayerResultMap">
+        SELECT <include refid="selectColumns"/>
+        FROM player
+        WHERE player_type = 'BATTER'
+          AND home_runs IS NOT NULL
+        ORDER BY home_runs DESC
+        LIMIT #{limit}
+    </select>
+
+    <!-- 방어율 랭킹 -->
+    <select id="findEraRanking" resultMap="PlayerResultMap">
+        SELECT <include refid="selectColumns"/>
+        FROM player
+        WHERE player_type = 'PITCHER'
+          AND era IS NOT NULL
+          AND games >= 5
+        ORDER BY era ASC
+        LIMIT #{limit}
+    </select>
+
+    <!-- 승리 랭킹 -->
+    <select id="findWinsRanking" resultMap="PlayerResultMap">
+        SELECT <include refid="selectColumns"/>
+        FROM player
+        WHERE player_type = 'PITCHER'
+          AND wins IS NOT NULL
+        ORDER BY wins DESC
+        LIMIT #{limit}
+    </select>
+
+    <!-- 팀별 통계 -->
+    <select id="findTeamStats" resultType="com.kbo.stats.dto.TeamStatDto">
+        SELECT
+            team,
+            SUM(home_runs)                              AS totalHomeRuns,
+            ROUND(AVG(batting_avg), 3)                  AS avgBattingAvg,
+            COUNT(*)                                    AS playerCount
+        FROM player
+        WHERE player_type = 'BATTER'
+        GROUP BY team
+        ORDER BY totalHomeRuns DESC
+    </select>
+
+    <!-- 팀 목록 -->
+    <select id="findAllTeams" resultType="string">
+        SELECT DISTINCT team
+        FROM player
+        ORDER BY team
+    </select>
+
+</mapper>
