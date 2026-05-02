@@ -104,11 +104,46 @@
     const battingAvgs = teamStats.map(s => s.avgBattingAvg   ?? 0);
     const playerCount = teamStats.map(s => s.playerCount     ?? 0);
 
-    const TEAM_COLORS = [
-        '#FF6384','#36A2EB','#FFCE56','#4BC0C0',
-        '#9966FF','#FF9F40','#FF6384','#C9CBCF',
-        '#4BC0C0','#F77825'
-    ];
+    const TEAM_COLOR_MAP = {
+        // 전체 이름
+        'KIA 타이거즈':  '#EA0029',
+        '삼성 라이온즈': '#074CA1',
+        'LG 트윈스':     '#C30452',
+        '두산 베어스':   '#131230',
+        '롯데 자이언츠': '#002955',
+        'SSG 랜더스':    '#CE0E2D',
+        'NC 다이노스':   '#315288',
+        'KT 위즈':       '#000000',
+        '키움 히어로즈': '#570514',
+        '한화 이글스':   '#FF6600',
+        // 크롤링 약칭 (Statiz / KBO 공식)
+        'KIA':  '#EA0029',
+        '삼성': '#074CA1',
+        'LG':   '#C30452',
+        '두산': '#131230',
+        '롯데': '#002955',
+        'SSG':  '#CE0E2D',
+        'NC':   '#315288',
+        'KT':   '#000000',
+        '키움': '#570514',
+        '한화': '#FF6600'
+    };
+    const DEFAULT_COLOR = '#888888';
+
+    function resolveTeamColor(teamName) {
+        if (!teamName) return DEFAULT_COLOR;
+        const exact = TEAM_COLOR_MAP[teamName.trim()];
+        if (exact) return exact;
+        // 부분 일치 fallback (e.g. "키움 히어로즈" ↔ "키움")
+        const lowerName = teamName.trim().toLowerCase();
+        for (const [key, color] of Object.entries(TEAM_COLOR_MAP)) {
+            const lowerKey = key.toLowerCase();
+            if (lowerName.includes(lowerKey) || lowerKey.includes(lowerName)) return color;
+        }
+        return DEFAULT_COLOR;
+    }
+
+    const TEAM_COLORS = labels.map(t => resolveTeamColor(t));
 
     // 1) 팀별 홈런 수 (Bar)
     new Chart(document.getElementById('homeRunChart'), {
