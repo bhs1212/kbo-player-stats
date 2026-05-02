@@ -13,6 +13,7 @@ import org.springframework.stereotype.Service;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.function.Function;
 
 @Slf4j
 @Service
@@ -26,12 +27,14 @@ public class CrawlingService {
 
     private static final int TIMEOUT_MS = 15_000;
     private static final int CURRENT_SEASON = 2026;
+    private static final int MAX_PAGES = 30;
+    private static final long PAGE_DELAY_MS = 500;
 
     // Statiz: opt=0 타자, opt=1 투수
     private static final String STATIZ_BASE =
-            "https://statiz.co.kr/stat.php?opt=%d&sopt=0&re=0&ession=" + CURRENT_SEASON;
-    private static final String STATIZ_BATTER_URL  = String.format(STATIZ_BASE, 0);
-    private static final String STATIZ_PITCHER_URL = String.format(STATIZ_BASE, 1);
+            "https://statiz.co.kr/stat.php?opt=%d&sopt=0&re=0&season=" + CURRENT_SEASON + "&pos=%d";
+    private static final String STATIZ_BATTER_URL  = "https://statiz.co.kr/stat.php?opt=0&sopt=0&re=0&season=" + CURRENT_SEASON;
+    private static final String STATIZ_PITCHER_URL = "https://statiz.co.kr/stat.php?opt=1&sopt=0&re=0&season=" + CURRENT_SEASON;
 
     // KBO 공식 사이트 fallback
     private static final String KBO_BATTER_URL  =
@@ -83,41 +86,46 @@ public class CrawlingService {
     // ─────────────────────────────────────────────────────────────────────────
 
     private List<Player> crawlStatizBatters() {
-        List<Player> players = new ArrayList<>();
-        try {
-            Document doc = fetchDocument(STATIZ_BATTER_URL, "https://statiz.co.kr");
-            Elements rows = selectTableRows(doc);
-            log.debug("[타자/Statiz] 파싱 대상 행: {}개", rows.size());
-            for (Element row : rows) {
-                try {
-                    Player p = parseStatizBatterRow(row);
-                    if (p != null) { players.add(p); playerService.saveOrUpdate(p); }
-                } catch (Exception e) {
-                    log.warn("[타자/Statiz] 행 파싱 실패: {}", e.getMessage());
-                }
-            }
-        } catch (IOException e) {
-            log.error("[타자/Statiz] 연결 실패: {}", e.getMessage());
-        }
-        return players;
+        return crawlStatizPages(STATIZ_BATTER_URL, this::parseStatizBatterRow, "타자");
     }
 
     private List<Player> crawlStatizPitchers() {
+        return crawlStatizPages(STATIZ_PITCHER_URL, this::parseStatizPitcherRow, "투수");
+    }
+
+    private List<Player> crawlStatizPages(String baseUrl, Function<Element, Player> parser, String label) {
         List<Player> players = new ArrayList<>();
-        try {
-            Document doc = fetchDocument(STATIZ_PITCHER_URL, "https://statiz.co.kr");
-            Elements rows = selectTableRows(doc);
-            log.debug("[투수/Statiz] 파싱 대상 행: {}개", rows.size());
-            for (Element row : rows) {
-                try {
-                    Player p = parseStatizPitcherRow(row);
-                    if (p != null) { players.add(p); playerService.saveOrUpdate(p); }
-                } catch (Exception e) {
-                    log.warn("[투수/Statiz] 행 파싱 실패: {}", e.getMessage());
+        for (int page = 1; page <= MAX_PAGES; page++) {
+            String url = baseUrl + "&page=" + page;
+            log.debug("[{}/Statiz] 페이지 {} 요청: {}", label, page, url);
+            try {
+                Document doc = fetchDocument(url, "https://statiz.co.kr");
+                Elements rows = selectTableRows(doc);
+                int pageCount = 0;
+                for (Element row : rows) {
+                    try {
+                        Player p = parser.apply(row);
+                        if (p != null) { players.add(p); playerService.saveOrUpdate(p); pageCount++; }
+                    } catch (Exception e) {
+                        log.warn("[{}/Statiz] 행 파싱 실패: {}", label, e.getMessage());
+                    }
                 }
+                log.debug("[{}/Statiz] 페이지 {} 결과: {}명", label, page, pageCount);
+                if (pageCount == 0) {
+                    log.info("[{}/Statiz] 페이지 {}에 선수 없음 → 순회 종료 (누적: {}명)", label, page, players.size());
+                    break;
+                }
+                if (page < MAX_PAGES) {
+                    Thread.sleep(PAGE_DELAY_MS);
+                }
+            } catch (IOException e) {
+                log.error("[{}/Statiz] 페이지 {} 연결 실패: {}", label, page, e.getMessage());
+                break;
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                log.warn("[{}/Statiz] 딜레이 인터럽트 → 크롤링 중단", label);
+                break;
             }
-        } catch (IOException e) {
-            log.error("[투수/Statiz] 연결 실패: {}", e.getMessage());
         }
         return players;
     }
