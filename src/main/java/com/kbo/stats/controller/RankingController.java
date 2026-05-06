@@ -19,6 +19,7 @@ public class RankingController {
     public String ranking(@RequestParam(defaultValue = "30") int limit, Model model) {
         model.addAttribute("battingRanking",  playerService.getBattingRanking(limit));
         model.addAttribute("homeRunRanking",  playerService.getHomeRunRanking(limit));
+        model.addAttribute("rbiRanking",      playerService.getRbiRanking(limit));
         model.addAttribute("eraRanking",      playerService.getEraRanking(limit));
         model.addAttribute("winsRanking",     playerService.getWinsRanking(limit));
         model.addAttribute("limit", limit);

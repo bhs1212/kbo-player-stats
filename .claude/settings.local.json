@@ -1,0 +1,18 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(mvn compile *)",
+      "mcp__ide__getDiagnostics",
+      "Bash(mvn clean *)",
+      "Bash(java -version)",
+      "Bash(mvn -version)",
+      "Bash(JAVA_HOME=\"C:/Program Files/Eclipse Adoptium/jdk-17.0.4.101-hotspot\" mvn clean compile)",
+      "PowerShell([System.Environment]::SetEnvironmentVariable\\(\"JAVA_HOME\", \"C:\\\\Program Files\\\\Eclipse Adoptium\\\\jdk-17.0.4.101-hotspot\", \"User\"\\))",
+      "PowerShell([System.Environment]::GetEnvironmentVariable\\(\"JAVA_HOME\", \"User\"\\))",
+      "Bash(mvnw.cmd compile *)",
+      "PowerShell(.\\\\mvnw.cmd compile -q 2>&1)",
+      "PowerShell(mvn compile *)",
+      "PowerShell(mvn test *)"
+    ]
+  }
+}

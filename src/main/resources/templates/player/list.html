@@ -12,11 +12,9 @@
 <div class="d-flex justify-content-between align-items-center mb-3">
     <h4 class="mb-0"><i class="bi bi-people-fill text-primary"></i> 선수 목록</h4>
     <div class="d-flex gap-2">
-        <!-- CSV 임포트 -->
         <button class="btn btn-outline-secondary btn-sm" data-bs-toggle="modal" data-bs-target="#importModal">
             <i class="bi bi-upload"></i> CSV 임포트
         </button>
-        <!-- 수동 크롤링 -->
         <form th:action="@{/crawling/run}" method="post" class="d-inline">
             <button type="submit" class="btn btn-outline-info btn-sm"
                     onclick="return confirm('크롤링을 실행하시겠습니까? (시간이 걸릴 수 있습니다)')">
@@ -29,10 +27,27 @@
     </div>
 </div>
 
+<!-- 타자/투수 탭 -->
+<ul class="nav nav-tabs mb-3">
+    <li class="nav-item">
+        <a class="nav-link" th:classappend="${isBatter} ? 'active'"
+           th:href="@{/players(playerType='BATTER')}">
+            <i class="bi bi-person-fill text-primary"></i> 타자
+        </a>
+    </li>
+    <li class="nav-item">
+        <a class="nav-link" th:classappend="${!isBatter} ? 'active'"
+           th:href="@{/players(playerType='PITCHER')}">
+            <i class="bi bi-person-fill text-danger"></i> 투수
+        </a>
+    </li>
+</ul>
+
 <!-- 검색 필터 -->
 <div class="card mb-3">
     <div class="card-body">
         <form th:action="@{/players}" method="get" class="row g-2 align-items-end">
+            <input type="hidden" name="playerType" th:value="${searchDto.playerType}">
             <div class="col-md-3">
                 <label class="form-label small text-muted">선수명</label>
                 <input type="text" name="name" class="form-control form-control-sm"
@@ -48,26 +63,16 @@
                             th:selected="${team == searchDto.team}"></option>
                 </select>
             </div>
-            <div class="col-md-2">
-                <label class="form-label small text-muted">구분</label>
-                <select name="playerType" class="form-select form-select-sm">
-                    <option value="">전체</option>
-                    <option th:each="pt : ${playerTypes}"
-                            th:value="${pt.name()}"
-                            th:text="${pt.displayName}"
-                            th:selected="${pt == searchDto.playerType}"></option>
-                </select>
-            </div>
-            <div class="col-md-2">
+            <div class="col-md-3">
                 <label class="form-label small text-muted">포지션</label>
                 <input type="text" name="position" class="form-control form-control-sm"
                        placeholder="포지션" th:value="${searchDto.position}">
             </div>
-            <div class="col-md-2 d-flex gap-1">
+            <div class="col-md-3 d-flex gap-1">
                 <button type="submit" class="btn btn-primary btn-sm w-100">
                     <i class="bi bi-search"></i> 검색
                 </button>
-                <a th:href="@{/players}" class="btn btn-outline-secondary btn-sm">초기화</a>
+                <a th:href="@{/players(playerType=${searchDto.playerType})}" class="btn btn-outline-secondary btn-sm">초기화</a>
             </div>
         </form>
     </div>
@@ -81,28 +86,25 @@
     <small class="text-muted" th:text="${page.page} + ' / ' + ${page.totalPages} + ' 페이지'"></small>
 </div>
 
-<!-- 선수 테이블 -->
-<div class="table-responsive">
+<!-- 타자 테이블 -->
+<div class="table-responsive" th:if="${isBatter}">
     <table class="table table-hover table-bordered align-middle">
         <thead>
         <tr>
             <th>이름</th>
             <th>팀</th>
             <th>포지션</th>
-            <th>구분</th>
             <th>타율</th>
             <th>홈런</th>
             <th>안타</th>
             <th>타점</th>
-            <th>방어율</th>
-            <th>승</th>
             <th>경기</th>
             <th>관리</th>
         </tr>
         </thead>
         <tbody>
         <tr th:if="${page.content.isEmpty()}">
-            <td colspan="12" class="text-center text-muted py-4">
+            <td colspan="9" class="text-center text-muted py-4">
                 <i class="bi bi-inbox fs-3 d-block mb-2"></i>
                 등록된 선수가 없습니다.
             </td>
@@ -114,18 +116,58 @@
             </td>
             <td th:text="${player.team}"></td>
             <td th:text="${player.position}"></td>
-            <td>
-                <span th:if="${player.batter}"
-                      class="badge badge-batter">타자</span>
-                <span th:if="${player.pitcher}"
-                      class="badge badge-pitcher">투수</span>
-            </td>
-            <!-- 타자 기록 -->
             <td th:text="${player.battingAvg != null ? #numbers.formatDecimal(player.battingAvg, 1, 3) : '-'}"></td>
             <td th:text="${player.homeRuns != null ? player.homeRuns : '-'}"></td>
             <td th:text="${player.hits != null ? player.hits : '-'}"></td>
             <td th:text="${player.rbi != null ? player.rbi : '-'}"></td>
-            <!-- 투수 기록 -->
+            <td th:text="${player.games != null ? player.games : '-'}"></td>
+            <td>
+                <div class="d-flex gap-1">
+                    <a th:href="@{/players/{id}/edit(id=${player.id})}"
+                       class="btn btn-outline-warning btn-sm">
+                        <i class="bi bi-pencil"></i>
+                    </a>
+                    <form th:action="@{/players/{id}/delete(id=${player.id})}" method="post" class="d-inline">
+                        <button type="submit" class="btn btn-outline-danger btn-sm"
+                                onclick="return confirm('삭제하시겠습니까?')">
+                            <i class="bi bi-trash"></i>
+                        </button>
+                    </form>
+                </div>
+            </td>
+        </tr>
+        </tbody>
+    </table>
+</div>
+
+<!-- 투수 테이블 -->
+<div class="table-responsive" th:if="${!isBatter}">
+    <table class="table table-hover table-bordered align-middle">
+        <thead>
+        <tr>
+            <th>이름</th>
+            <th>팀</th>
+            <th>포지션</th>
+            <th>방어율</th>
+            <th>승</th>
+            <th>경기</th>
+            <th>관리</th>
+        </tr>
+        </thead>
+        <tbody>
+        <tr th:if="${page.content.isEmpty()}">
+            <td colspan="7" class="text-center text-muted py-4">
+                <i class="bi bi-inbox fs-3 d-block mb-2"></i>
+                등록된 선수가 없습니다.
+            </td>
+        </tr>
+        <tr th:each="player : ${page.content}">
+            <td>
+                <a th:href="@{/players/{id}(id=${player.id})}"
+                   class="fw-bold text-decoration-none" th:text="${player.name}"></a>
+            </td>
+            <td th:text="${player.team}"></td>
+            <td th:text="${player.position}"></td>
             <td th:text="${player.era != null ? #numbers.formatDecimal(player.era, 1, 2) : '-'}"></td>
             <td th:text="${player.wins != null ? player.wins : '-'}"></td>
             <td th:text="${player.games != null ? player.games : '-'}"></td>

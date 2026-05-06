@@ -114,6 +114,11 @@
         DELETE FROM player WHERE id = #{id}
     </delete>
 
+    <!-- 전체 삭제 -->
+    <delete id="deleteAll">
+        DELETE FROM player
+    </delete>
+
     <!-- 타율 랭킹 -->
     <select id="findBattingRanking" resultMap="PlayerResultMap">
         SELECT <include refid="selectColumns"/>
@@ -132,6 +137,16 @@
         WHERE player_type = 'BATTER'
           AND home_runs IS NOT NULL
         ORDER BY home_runs DESC
+        LIMIT #{limit}
+    </select>
+
+    <!-- 타점 랭킹 -->
+    <select id="findRbiRanking" resultMap="PlayerResultMap">
+        SELECT <include refid="selectColumns"/>
+        FROM player
+        WHERE player_type = 'BATTER'
+          AND rbi IS NOT NULL
+        ORDER BY rbi DESC
         LIMIT #{limit}
     </select>
 

@@ -2,18 +2,26 @@ package com.kbo.stats.service;
 
 import com.kbo.stats.domain.Player;
 import com.kbo.stats.domain.PlayerType;
+import io.github.bonigarcia.wdm.WebDriverManager;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
 import org.jsoup.select.Elements;
+import org.openqa.selenium.By;
+import org.openqa.selenium.JavascriptExecutor;
+import org.openqa.selenium.WebDriver;
+import org.openqa.selenium.WebElement;
+import org.openqa.selenium.chrome.ChromeDriver;
+import org.openqa.selenium.chrome.ChromeOptions;
+import org.openqa.selenium.support.ui.ExpectedConditions;
+import org.openqa.selenium.support.ui.WebDriverWait;
 import org.springframework.stereotype.Service;
 
-import java.io.IOException;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.function.Function;
 
 @Slf4j
 @Service
@@ -25,216 +33,181 @@ public class CrawlingService {
             "AppleWebKit/537.36 (KHTML, like Gecko) " +
             "Chrome/124.0.0.0 Safari/537.36";
 
-    private static final int TIMEOUT_MS = 15_000;
     private static final int CURRENT_SEASON = 2026;
-    private static final int MAX_PAGES = 30;
-    private static final long PAGE_DELAY_MS = 500;
+    private static final long TABLE_WAIT_SECONDS = 20;
+    private static final long PAGE_DELAY_MS = 2_000;
 
-    // Statiz: opt=0 타자, opt=1 투수
-    private static final String STATIZ_BASE =
-            "https://statiz.co.kr/stat.php?opt=%d&sopt=0&re=0&season=" + CURRENT_SEASON + "&pos=%d";
-    private static final String STATIZ_BATTER_URL  = "https://statiz.co.kr/stat.php?opt=0&sopt=0&re=0&season=" + CURRENT_SEASON;
-    private static final String STATIZ_PITCHER_URL = "https://statiz.co.kr/stat.php?opt=1&sopt=0&re=0&season=" + CURRENT_SEASON;
-
-    // KBO 공식 사이트 fallback
-    private static final String KBO_BATTER_URL  =
+    private static final String KBO_BATTER_URL =
             "https://www.koreabaseball.com/Record/Player/HitterBasic/Basic1.aspx";
     private static final String KBO_PITCHER_URL =
             "https://www.koreabaseball.com/Record/Player/PitcherBasic/Basic1.aspx";
+
+    private static final String TABLE_ROW_SEL = "table.tData01 tbody tr";
+    private static final String PAGER_LINK_SEL = "div.paging a";
 
     private final PlayerService playerService;
 
     public void crawlAll() {
         log.info("=== KBO 크롤링 시작 (시즌: {}) ===", CURRENT_SEASON);
-        int batterCount  = crawlBatters();
-        int pitcherCount = crawlPitchers();
+        playerService.deleteAll();
+        int batterCount  = crawlKbo(KBO_BATTER_URL,  PlayerType.BATTER,  "타자");
+        int pitcherCount = crawlKbo(KBO_PITCHER_URL, PlayerType.PITCHER, "투수");
         log.info("=== KBO 크롤링 완료 | 타자: {}명, 투수: {}명 ===", batterCount, pitcherCount);
     }
 
-    // ─────────────────────────────────────────────────────────────────────────
-    // 공개 진입점: Statiz 실패 시 KBO fallback
-    // ─────────────────────────────────────────────────────────────────────────
-
-    private int crawlBatters() {
-        log.info("[타자] Statiz 크롤링 시도: {}", STATIZ_BATTER_URL);
-        List<Player> result = crawlStatizBatters();
-        if (!result.isEmpty()) {
-            log.info("[타자] Statiz 성공: {}명 저장", result.size());
-            return result.size();
-        }
-        log.warn("[타자] Statiz 결과 없음 → KBO 공식 사이트 fallback: {}", KBO_BATTER_URL);
-        result = crawlKboBatters();
-        log.info("[타자] KBO 결과: {}명 저장", result.size());
-        return result.size();
-    }
-
-    private int crawlPitchers() {
-        log.info("[투수] Statiz 크롤링 시도: {}", STATIZ_PITCHER_URL);
-        List<Player> result = crawlStatizPitchers();
-        if (!result.isEmpty()) {
-            log.info("[투수] Statiz 성공: {}명 저장", result.size());
-            return result.size();
-        }
-        log.warn("[투수] Statiz 결과 없음 → KBO 공식 사이트 fallback: {}", KBO_PITCHER_URL);
-        result = crawlKboPitchers();
-        log.info("[투수] KBO 결과: {}명 저장", result.size());
-        return result.size();
-    }
-
-    // ─────────────────────────────────────────────────────────────────────────
-    // Statiz 크롤링
-    // ─────────────────────────────────────────────────────────────────────────
-
-    private List<Player> crawlStatizBatters() {
-        return crawlStatizPages(STATIZ_BATTER_URL, this::parseStatizBatterRow, "타자");
-    }
-
-    private List<Player> crawlStatizPitchers() {
-        return crawlStatizPages(STATIZ_PITCHER_URL, this::parseStatizPitcherRow, "투수");
-    }
-
-    private List<Player> crawlStatizPages(String baseUrl, Function<Element, Player> parser, String label) {
+    private int crawlKbo(String url, PlayerType playerType, String label) {
         List<Player> players = new ArrayList<>();
-        for (int page = 1; page <= MAX_PAGES; page++) {
-            String url = baseUrl + "&page=" + page;
-            log.debug("[{}/Statiz] 페이지 {} 요청: {}", label, page, url);
-            try {
-                Document doc = fetchDocument(url, "https://statiz.co.kr");
-                Elements rows = selectTableRows(doc);
-                int pageCount = 0;
-                for (Element row : rows) {
-                    try {
-                        Player p = parser.apply(row);
-                        if (p != null) { players.add(p); playerService.saveOrUpdate(p); pageCount++; }
-                    } catch (Exception e) {
-                        log.warn("[{}/Statiz] 행 파싱 실패: {}", label, e.getMessage());
-                    }
-                }
-                log.debug("[{}/Statiz] 페이지 {} 결과: {}명", label, page, pageCount);
-                if (pageCount == 0) {
-                    log.info("[{}/Statiz] 페이지 {}에 선수 없음 → 순회 종료 (누적: {}명)", label, page, players.size());
+        WebDriver driver = null;
+        try {
+            driver = createDriver();
+            log.info("[{}] 브라우저 오픈 → {}", label, url);
+            driver.get(url);
+
+            WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(TABLE_WAIT_SECONDS));
+            wait.until(ExpectedConditions.presenceOfElementLocated(By.cssSelector(TABLE_ROW_SEL)));
+            Thread.sleep(PAGE_DELAY_MS);
+
+            for (int page = 1; ; page++) {
+                int collected = collectPage(driver, playerType, label, page, players);
+                log.info("[{}] 페이지 {} 수집: {}명 (누적: {}명)", label, page, collected, players.size());
+
+                if (!goToNextPage(driver, wait)) {
+                    log.info("[{}] 마지막 페이지 ({}) → 종료", label, page);
                     break;
                 }
-                if (page < MAX_PAGES) {
-                    Thread.sleep(PAGE_DELAY_MS);
-                }
-            } catch (IOException e) {
-                log.error("[{}/Statiz] 페이지 {} 연결 실패: {}", label, page, e.getMessage());
-                break;
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-                log.warn("[{}/Statiz] 딜레이 인터럽트 → 크롤링 중단", label);
-                break;
+            }
+
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            log.warn("[{}] 인터럽트 → 크롤링 중단 (수집: {}명)", label, players.size());
+        } catch (Exception e) {
+            log.error("[{}] 크롤링 실패: {} (수집: {}명)", label, e.getMessage(), players.size(), e);
+        } finally {
+            if (driver != null) {
+                try { driver.quit(); } catch (Exception ignored) {}
             }
         }
-        return players;
+        return players.size();
     }
 
-    /**
-     * Statiz 타자 기록 컬럼 (opt=0):
-     * 0:순위 1:선수 2:팀 3:G 4:PA 5:AB 6:R 7:H 8:2B 9:3B 10:HR 11:TB
-     * 12:RBI 13:SB 14:CS 15:BB 16:SO 17:GDP 18:BABIP 19:OPS 20:AVG 21:OBP 22:SLG
-     */
-    private Player parseStatizBatterRow(Element row) {
-        Elements cols = row.select("td");
-        if (cols.size() < 21) return null;
+    private int collectPage(WebDriver driver, PlayerType playerType,
+                            String label, int page, List<Player> players) {
+        Document doc = Jsoup.parse(driver.getPageSource());
+        Elements rows = filterDataRows(doc.select(TABLE_ROW_SEL));
+        if (rows.isEmpty()) {
+            log.warn("[{}] 페이지 {}에서 테이블 행을 찾지 못함", label, page);
+            return 0;
+        }
 
-        String name = extractPlayerName(cols.get(1));
-        String team = cols.get(2).text().trim();
-        if (name.isBlank() || team.isBlank()) return null;
-        if (!isNumeric(cols.get(3).text())) return null; // 헤더/소계 행 스킵
-
-        return Player.builder()
-                .name(name)
-                .team(team)
-                .position("타자")
-                .playerType(PlayerType.BATTER)
-                .games(parseInt(cols.get(3).text()))
-                .hits(parseInt(cols.get(7).text()))
-                .homeRuns(parseInt(cols.get(10).text()))
-                .rbi(parseInt(cols.get(12).text()))
-                .battingAvg(parseDouble(cols.get(20).text()))
-                .build();
+        int count = 0;
+        for (Element row : rows) {
+            try {
+                Player p = playerType == PlayerType.BATTER
+                        ? parseKboBatterRow(row)
+                        : parseKboPitcherRow(row);
+                if (p != null) {
+                    players.add(p);
+                    playerService.saveOrUpdate(p);
+                    count++;
+                }
+            } catch (Exception e) {
+                log.warn("[{}] 행 파싱 실패: {}", label, e.getMessage());
+            }
+        }
+        return count;
     }
 
-    /**
-     * Statiz 투수 기록 컬럼 (opt=1):
-     * 0:순위 1:선수 2:팀 3:G 4:GS 5:CG 6:ShO 7:W 8:L 9:SV 10:HLD
-     * 11:IP 12:BF 13:NP 14:H 15:HR 16:BB 17:HBP 18:SO 19:R 20:ER 21:ERA 22:WHIP
-     */
-    private Player parseStatizPitcherRow(Element row) {
-        Elements cols = row.select("td");
-        if (cols.size() < 22) return null;
-
-        String name = extractPlayerName(cols.get(1));
-        String team = cols.get(2).text().trim();
-        if (name.isBlank() || team.isBlank()) return null;
-        if (!isNumeric(cols.get(3).text())) return null;
-
-        return Player.builder()
-                .name(name)
-                .team(team)
-                .position("투수")
-                .playerType(PlayerType.PITCHER)
-                .games(parseInt(cols.get(3).text()))
-                .wins(parseInt(cols.get(7).text()))
-                .era(parseDouble(cols.get(21).text()))
-                .build();
+    // td 없는 행, th 포함 행, 5열 미만, 첫 셀이 숫자(순위)가 아닌 행 제거
+    private Elements filterDataRows(Elements rows) {
+        Elements result = new Elements();
+        for (Element row : rows) {
+            Elements tds = row.select("td");
+            if (tds.isEmpty()) continue;
+            if (!row.select("th").isEmpty()) continue;
+            if (tds.size() < 5) continue;
+            if (!isNumeric(tds.first().text().trim())) continue;
+            result.add(row);
+        }
+        return result;
     }
 
-    // ─────────────────────────────────────────────────────────────────────────
-    // KBO 공식 사이트 Fallback 크롤링
-    // ─────────────────────────────────────────────────────────────────────────
-
-    private List<Player> crawlKboBatters() {
-        List<Player> players = new ArrayList<>();
+    private boolean goToNextPage(WebDriver driver, WebDriverWait wait) throws InterruptedException {
+        String prevFirstRow;
         try {
-            Document doc = fetchDocument(KBO_BATTER_URL, "https://www.koreabaseball.com");
-            Elements rows = selectKboTableRows(doc);
-            log.debug("[타자/KBO] 파싱 대상 행: {}개", rows.size());
-            for (Element row : rows) {
-                try {
-                    Player p = parseKboBatterRow(row);
-                    if (p != null) { players.add(p); playerService.saveOrUpdate(p); }
-                } catch (Exception e) {
-                    log.warn("[타자/KBO] 행 파싱 실패: {}", e.getMessage());
-                }
-            }
-        } catch (IOException e) {
-            log.error("[타자/KBO] 연결 실패: {}", e.getMessage());
+            prevFirstRow = driver.findElement(By.cssSelector(TABLE_ROW_SEL)).getText().trim();
+        } catch (Exception e) {
+            return false;
         }
-        return players;
-    }
 
-    private List<Player> crawlKboPitchers() {
-        List<Player> players = new ArrayList<>();
+        int currentPage = getCurrentPageNumber(driver);
+        WebElement nextBtn = findPageNumberLink(driver, currentPage + 1);
+        if (nextBtn == null) {
+            nextBtn = findNextGroupButton(driver);
+        }
+        if (nextBtn == null) {
+            return false;
+        }
+
         try {
-            Document doc = fetchDocument(KBO_PITCHER_URL, "https://www.koreabaseball.com");
-            Elements rows = selectKboTableRows(doc);
-            log.debug("[투수/KBO] 파싱 대상 행: {}개", rows.size());
-            for (Element row : rows) {
-                try {
-                    Player p = parseKboPitcherRow(row);
-                    if (p != null) { players.add(p); playerService.saveOrUpdate(p); }
-                } catch (Exception e) {
-                    log.warn("[투수/KBO] 행 파싱 실패: {}", e.getMessage());
-                }
-            }
-        } catch (IOException e) {
-            log.error("[투수/KBO] 연결 실패: {}", e.getMessage());
+            nextBtn.click();
+        } catch (Exception e) {
+            ((JavascriptExecutor) driver).executeScript("arguments[0].click();", nextBtn);
         }
-        return players;
+
+        try {
+            wait.until(d -> {
+                try {
+                    String cur = d.findElement(By.cssSelector(TABLE_ROW_SEL)).getText().trim();
+                    return !cur.isEmpty() && !cur.equals(prevFirstRow);
+                } catch (Exception ex) {
+                    return false;
+                }
+            });
+        } catch (Exception e) {
+            Thread.sleep(PAGE_DELAY_MS);
+        }
+        Thread.sleep(500);
+        return true;
     }
 
-    /**
-     * KBO 공식 타자 기록 컬럼:
-     * 0:순위 1:선수명 2:팀 3:AVG 4:G 5:PA 6:AB 7:R 8:H 9:2B 10:3B 11:HR 12:TB 13:RBI ...
-     */
+    // 현재 페이지: div.paging 내 class="on" 링크의 텍스트
+    private int getCurrentPageNumber(WebDriver driver) {
+        try {
+            WebElement active = driver.findElement(By.cssSelector("div.paging a.on"));
+            String text = active.getText().trim();
+            if (isNumeric(text)) return Integer.parseInt(text);
+        } catch (Exception e) {
+            log.debug("[페이지네이션] 현재 페이지 감지 실패: {}", e.getMessage());
+        }
+        return 1;
+    }
+
+    private WebElement findPageNumberLink(WebDriver driver, int pageNumber) {
+        String target = String.valueOf(pageNumber);
+        try {
+            for (WebElement link : driver.findElements(By.cssSelector(PAGER_LINK_SEL))) {
+                if (target.equals(link.getText().trim())) return link;
+            }
+        } catch (Exception ignored) {}
+        return null;
+    }
+
+    private WebElement findNextGroupButton(WebDriver driver) {
+        try {
+            for (WebElement link : driver.findElements(By.cssSelector(PAGER_LINK_SEL))) {
+                String text = link.getText().trim();
+                if (">".equals(text) || "다음".equals(text) || "▶".equals(text)) return link;
+            }
+        } catch (Exception ignored) {}
+        return null;
+    }
+
+    // 타자 컬럼: 순위(0) 선수명(1) 팀명(2) AVG(3) G(4) PA(5) AB(6) R(7) H(8) 2B(9) 3B(10) HR(11) TB(12) RBI(13)
     private Player parseKboBatterRow(Element row) {
         Elements cols = row.select("td");
         if (cols.size() < 14) return null;
 
-        String name = extractPlayerName(cols.get(1));
+        String name = extractName(cols.get(1));
         String team = cols.get(2).text().trim();
         if (name.isBlank() || team.isBlank()) return null;
         if (!isNumeric(cols.get(4).text())) return null;
@@ -252,15 +225,12 @@ public class CrawlingService {
                 .build();
     }
 
-    /**
-     * KBO 공식 투수 기록 컬럼:
-     * 0:순위 1:선수명 2:팀 3:ERA 4:G 5:W 6:L 7:SV 8:HLD 9:IP ...
-     */
+    // 투수 컬럼: 순위(0) 선수명(1) 팀명(2) ERA(3) G(4) W(5) L(6) SV(7) HLD(8) WPCT(9)
     private Player parseKboPitcherRow(Element row) {
         Elements cols = row.select("td");
         if (cols.size() < 6) return null;
 
-        String name = extractPlayerName(cols.get(1));
+        String name = extractName(cols.get(1));
         String team = cols.get(2).text().trim();
         if (name.isBlank() || team.isBlank()) return null;
         if (!isNumeric(cols.get(4).text())) return null;
@@ -276,39 +246,26 @@ public class CrawlingService {
                 .build();
     }
 
-    // ─────────────────────────────────────────────────────────────────────────
-    // 공통 유틸리티
-    // ─────────────────────────────────────────────────────────────────────────
-
-    private Document fetchDocument(String url, String referrer) throws IOException {
-        return Jsoup.connect(url)
-                .userAgent(USER_AGENT)
-                .referrer(referrer)
-                .timeout(TIMEOUT_MS)
-                .get();
-    }
-
-    /** Statiz 테이블 행 선택: id > class > 첫 번째 table 순으로 시도 */
-    private Elements selectTableRows(Document doc) {
-        Elements rows = doc.select("table#mytable tbody tr");
-        if (rows.isEmpty()) rows = doc.select("table.tablesorter tbody tr");
-        if (rows.isEmpty()) rows = doc.select("div.container table tbody tr");
-        if (rows.isEmpty()) rows = doc.select("table tbody tr");
-        return rows;
-    }
-
-    /** KBO 공식 사이트 테이블 행 선택 */
-    private Elements selectKboTableRows(Document doc) {
-        Elements rows = doc.select("table#tblRecord tbody tr");
-        if (rows.isEmpty()) rows = doc.select(".tData01 tbody tr");
-        if (rows.isEmpty()) rows = doc.select("table tbody tr");
-        return rows;
-    }
-
-    /** 선수명 추출: <a> 링크 텍스트 우선, 없으면 셀 텍스트 */
-    private String extractPlayerName(Element col) {
+    private String extractName(Element col) {
         Element link = col.selectFirst("a");
-        return (link != null ? link.text() : col.text()).trim();
+        String text = (link != null ? link.text() : col.text()).trim();
+        int paren = text.indexOf('(');
+        return paren > 0 ? text.substring(0, paren).trim() : text;
+    }
+
+    private WebDriver createDriver() {
+        WebDriverManager.chromedriver().setup();
+        ChromeOptions options = new ChromeOptions();
+        options.addArguments("--headless=new");
+        options.addArguments("--no-sandbox");
+        options.addArguments("--disable-dev-shm-usage");
+        options.addArguments("--disable-gpu");
+        options.addArguments("--window-size=1920,1080");
+        options.addArguments("--lang=ko-KR,ko;q=0.9");
+        options.addArguments("user-agent=" + USER_AGENT);
+        ChromeDriver driver = new ChromeDriver(options);
+        driver.manage().timeouts().pageLoadTimeout(Duration.ofSeconds(30));
+        return driver;
     }
 
     private boolean isNumeric(String s) {

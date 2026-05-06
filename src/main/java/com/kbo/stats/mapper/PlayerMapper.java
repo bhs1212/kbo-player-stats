@@ -33,6 +33,9 @@ public interface PlayerMapper {
     // 삭제
     void deleteById(Long id);
 
+    // 전체 삭제 (크롤링 전 초기화)
+    void deleteAll();
+
     // 타율 랭킹 (타자)
     List<Player> findBattingRanking(@Param("limit") int limit);
 
@@ -41,6 +44,9 @@ public interface PlayerMapper {
 
     // 방어율 랭킹 (투수)
     List<Player> findEraRanking(@Param("limit") int limit);
+
+    // 타점 랭킹 (타자)
+    List<Player> findRbiRanking(@Param("limit") int limit);
 
     // 승리 랭킹 (투수)
     List<Player> findWinsRanking(@Param("limit") int limit);

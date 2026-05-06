@@ -68,6 +68,10 @@ public class PlayerService {
         return playerMapper.findHomeRunRanking(limit);
     }
 
+    public List<Player> getRbiRanking(int limit) {
+        return playerMapper.findRbiRanking(limit);
+    }
+
     public List<Player> getEraRanking(int limit) {
         return playerMapper.findEraRanking(limit);
     }
@@ -79,6 +83,12 @@ public class PlayerService {
     // 차트용 팀별 통계
     public List<TeamStatDto> getTeamStats() {
         return playerMapper.findTeamStats();
+    }
+
+    @Transactional
+    public void deleteAll() {
+        playerMapper.deleteAll();
+        log.info("선수 전체 삭제 완료");
     }
 
     // 크롤링/CSV 임포트 시 사용: upsert

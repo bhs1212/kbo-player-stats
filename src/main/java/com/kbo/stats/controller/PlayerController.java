@@ -30,13 +30,16 @@ public class PlayerController {
     /** 선수 목록 */
     @GetMapping
     public String list(PlayerSearchDto searchDto, Model model) {
+        if (searchDto.getPlayerType() == null) {
+            searchDto.setPlayerType(PlayerType.BATTER);
+        }
         PageDto<Player> page = playerService.search(searchDto);
         List<String> teams = playerService.findAllTeams();
 
         model.addAttribute("page", page);
         model.addAttribute("searchDto", searchDto);
         model.addAttribute("teams", teams);
-        model.addAttribute("playerTypes", PlayerType.values());
+        model.addAttribute("isBatter", searchDto.getPlayerType() == PlayerType.BATTER);
         return "player/list";
     }
 
