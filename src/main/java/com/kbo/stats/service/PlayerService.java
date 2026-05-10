@@ -1,6 +1,7 @@
 package com.kbo.stats.service;
 
 import com.kbo.stats.domain.Player;
+import com.kbo.stats.domain.PlayerType;
 import com.kbo.stats.dto.PageDto;
 import com.kbo.stats.dto.PlayerFormDto;
 import com.kbo.stats.dto.PlayerSearchDto;
@@ -59,6 +60,35 @@ public class PlayerService {
         log.info("선수 삭제: id={}", id);
     }
 
+    @Transactional
+    public void updateStolenBases(String name, String team, Integer stolenBases) {
+        playerMapper.updateStolenBases(name, team, stolenBases);
+    }
+
+    @Transactional
+    public void saveOrUpdateSavesHolds(String name, String team,
+                                        Integer saves, Integer holds,
+                                        Double era, Integer games, Integer wins) {
+        playerMapper.findByNameAndTeam(name, team)
+                .ifPresentOrElse(
+                        existing -> playerMapper.updateSavesAndHolds(name, team, saves, holds),
+                        () -> {
+                            Player p = Player.builder()
+                                    .name(name)
+                                    .team(team)
+                                    .position("투수")
+                                    .playerType(PlayerType.PITCHER)
+                                    .era(era)
+                                    .games(games)
+                                    .wins(wins)
+                                    .saves(saves)
+                                    .holds(holds)
+                                    .build();
+                            playerMapper.insert(p);
+                        }
+                );
+    }
+
     // 랭킹
     public List<Player> getBattingRanking(int limit) {
         return playerMapper.findBattingRanking(limit);
@@ -72,12 +102,24 @@ public class PlayerService {
         return playerMapper.findRbiRanking(limit);
     }
 
+    public List<Player> getStolenBasesRanking(int limit) {
+        return playerMapper.findStolenBasesRanking(limit);
+    }
+
     public List<Player> getEraRanking(int limit) {
         return playerMapper.findEraRanking(limit);
     }
 
     public List<Player> getWinsRanking(int limit) {
         return playerMapper.findWinsRanking(limit);
+    }
+
+    public List<Player> getSavesRanking(int limit) {
+        return playerMapper.findSavesRanking(limit);
+    }
+
+    public List<Player> getHoldsRanking(int limit) {
+        return playerMapper.findHoldsRanking(limit);
     }
 
     // 차트용 팀별 통계

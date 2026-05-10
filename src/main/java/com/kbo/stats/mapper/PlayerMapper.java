@@ -36,20 +36,37 @@ public interface PlayerMapper {
     // 전체 삭제 (크롤링 전 초기화)
     void deleteAll();
 
+    // 도루 단건 업데이트
+    void updateStolenBases(@Param("name") String name, @Param("team") String team,
+                           @Param("stolenBases") Integer stolenBases);
+
+    // 세이브/홀드 단건 업데이트 (구원투수 크롤링용)
+    void updateSavesAndHolds(@Param("name") String name, @Param("team") String team,
+                              @Param("saves") Integer saves, @Param("holds") Integer holds);
+
     // 타율 랭킹 (타자)
     List<Player> findBattingRanking(@Param("limit") int limit);
 
     // 홈런 랭킹 (타자)
     List<Player> findHomeRunRanking(@Param("limit") int limit);
 
-    // 방어율 랭킹 (투수)
-    List<Player> findEraRanking(@Param("limit") int limit);
-
     // 타점 랭킹 (타자)
     List<Player> findRbiRanking(@Param("limit") int limit);
 
+    // 도루 랭킹 (타자)
+    List<Player> findStolenBasesRanking(@Param("limit") int limit);
+
+    // 방어율 랭킹 (투수)
+    List<Player> findEraRanking(@Param("limit") int limit);
+
     // 승리 랭킹 (투수)
     List<Player> findWinsRanking(@Param("limit") int limit);
+
+    // 세이브 랭킹 (투수)
+    List<Player> findSavesRanking(@Param("limit") int limit);
+
+    // 홀드 랭킹 (투수)
+    List<Player> findHoldsRanking(@Param("limit") int limit);
 
     // 팀별 통계
     List<TeamStatDto> findTeamStats();

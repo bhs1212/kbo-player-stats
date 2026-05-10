@@ -12,14 +12,17 @@ CREATE TABLE IF NOT EXISTS player (
     player_type VARCHAR(10)    NOT NULL COMMENT '타자/투수 구분 (BATTER/PITCHER)',
 
     -- 타자 기록
-    batting_avg DECIMAL(5, 3)  DEFAULT NULL COMMENT '타율',
-    home_runs   INT            DEFAULT NULL COMMENT '홈런',
-    hits        INT            DEFAULT NULL COMMENT '안타',
-    rbi         INT            DEFAULT NULL COMMENT '타점',
+    batting_avg  DECIMAL(5, 3) DEFAULT NULL COMMENT '타율',
+    home_runs    INT           DEFAULT NULL COMMENT '홈런',
+    hits         INT           DEFAULT NULL COMMENT '안타',
+    rbi          INT           DEFAULT NULL COMMENT '타점',
+    stolen_bases INT           DEFAULT NULL COMMENT '도루',
 
     -- 투수 기록
-    era         DECIMAL(5, 2)  DEFAULT NULL COMMENT '방어율',
-    wins        INT            DEFAULT NULL COMMENT '승',
+    era          DECIMAL(5, 2) DEFAULT NULL COMMENT '방어율',
+    wins         INT           DEFAULT NULL COMMENT '승',
+    saves        INT           DEFAULT NULL COMMENT '세이브',
+    holds        INT           DEFAULT NULL COMMENT '홀드',
 
     -- 공통
     games       INT            DEFAULT NULL COMMENT '경기수',
@@ -30,3 +33,8 @@ CREATE TABLE IF NOT EXISTS player (
     INDEX idx_player_type (player_type),
     INDEX idx_player_name (name)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='KBO 선수 기록';
+
+-- 기존 테이블에 새 컬럼 추가 (이미 존재하면 무시)
+ALTER TABLE player ADD COLUMN IF NOT EXISTS stolen_bases INT DEFAULT NULL COMMENT '도루' AFTER rbi;
+ALTER TABLE player ADD COLUMN IF NOT EXISTS saves        INT DEFAULT NULL COMMENT '세이브' AFTER wins;
+ALTER TABLE player ADD COLUMN IF NOT EXISTS holds        INT DEFAULT NULL COMMENT '홀드' AFTER saves;

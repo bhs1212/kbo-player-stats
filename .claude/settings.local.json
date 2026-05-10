@@ -12,7 +12,15 @@
       "Bash(mvnw.cmd compile *)",
       "PowerShell(.\\\\mvnw.cmd compile -q 2>&1)",
       "PowerShell(mvn compile *)",
-      "PowerShell(mvn test *)"
+      "PowerShell(mvn test *)",
+      "Bash(git *)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:8080/players)",
+      "Bash(./mvnw.cmd spring-boot:run *)",
+      "Bash(cat C:\\\\\\\\Users\\\\\\\\HASUN~1\\\\\\\\AppData\\\\\\\\Local\\\\\\\\Temp\\\\\\\\claude\\\\\\\\C--Develops-kbo-player-stats\\\\\\\\306547c4-1211-4bb4-9780-13c5e6e0a8f6\\\\\\\\tasks\\\\\\\\bsovsqzyt.output)",
+      "PowerShell(mvn *)",
+      "PowerShell(Start-Process -FilePath \"mvn\" -ArgumentList \"spring-boot:run\" -WorkingDirectory \"C:\\\\Develops\\\\kbo-player-stats\" -RedirectStandardOutput \"C:\\\\Develops\\\\kbo-player-stats\\\\app.log\" -RedirectStandardError \"C:\\\\Develops\\\\kbo-player-stats\\\\app-err.log\" -NoNewWindow)",
+      "PowerShell(Get-Process *)",
+      "PowerShell(Start-Process -FilePath \"mvn\" -ArgumentList \"clean\", \"spring-boot:run\" -WorkingDirectory \"C:\\\\Develops\\\\kbo-player-stats\" -RedirectStandardOutput \"C:\\\\Develops\\\\kbo-player-stats\\\\app.log\" -RedirectStandardError \"C:\\\\Develops\\\\kbo-player-stats\\\\app-err.log\" -NoNewWindow)"
     ]
   }
 }

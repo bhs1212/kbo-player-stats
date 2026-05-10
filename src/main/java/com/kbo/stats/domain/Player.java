@@ -24,10 +24,13 @@ public class Player {
     private Integer homeRuns;
     private Integer hits;
     private Integer rbi;
+    private Integer stolenBases;
 
     // 투수 기록
     private Double era;
     private Integer wins;
+    private Integer saves;
+    private Integer holds;
 
     // 공통
     private Integer games;

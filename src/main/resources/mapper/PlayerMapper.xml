@@ -11,21 +11,24 @@
         <result property="position"   column="position"/>
         <result property="playerType" column="player_type"
                 typeHandler="org.apache.ibatis.type.EnumTypeHandler"/>
-        <result property="battingAvg" column="batting_avg"/>
-        <result property="homeRuns"   column="home_runs"/>
-        <result property="hits"       column="hits"/>
-        <result property="rbi"        column="rbi"/>
-        <result property="era"        column="era"/>
-        <result property="wins"       column="wins"/>
-        <result property="games"      column="games"/>
+        <result property="battingAvg"   column="batting_avg"/>
+        <result property="homeRuns"    column="home_runs"/>
+        <result property="hits"        column="hits"/>
+        <result property="rbi"         column="rbi"/>
+        <result property="stolenBases" column="stolen_bases"/>
+        <result property="era"         column="era"/>
+        <result property="wins"        column="wins"/>
+        <result property="saves"       column="saves"/>
+        <result property="holds"       column="holds"/>
+        <result property="games"       column="games"/>
         <result property="createdAt"  column="created_at"/>
         <result property="updatedAt"  column="updated_at"/>
     </resultMap>
 
     <sql id="selectColumns">
         id, name, team, position, player_type,
-        batting_avg, home_runs, hits, rbi,
-        era, wins, games,
+        batting_avg, home_runs, hits, rbi, stolen_bases,
+        era, wins, saves, holds, games,
         created_at, updated_at
     </sql>
 
@@ -84,29 +87,53 @@
     <insert id="insert" parameterType="com.kbo.stats.domain.Player"
             useGeneratedKeys="true" keyProperty="id">
         INSERT INTO player (name, team, position, player_type,
-                            batting_avg, home_runs, hits, rbi,
-                            era, wins, games)
+                            batting_avg, home_runs, hits, rbi, stolen_bases,
+                            era, wins, saves, holds, games)
         VALUES (#{name}, #{team}, #{position}, #{playerType},
-                #{battingAvg}, #{homeRuns}, #{hits}, #{rbi},
-                #{era}, #{wins}, #{games})
+                #{battingAvg}, #{homeRuns}, #{hits}, #{rbi}, #{stolenBases},
+                #{era}, #{wins}, #{saves}, #{holds}, #{games})
     </insert>
 
     <!-- 수정 -->
     <update id="update" parameterType="com.kbo.stats.domain.Player">
         UPDATE player
-        SET name        = #{name},
-            team        = #{team},
-            position    = #{position},
-            player_type = #{playerType},
-            batting_avg = #{battingAvg},
-            home_runs   = #{homeRuns},
-            hits        = #{hits},
-            rbi         = #{rbi},
-            era         = #{era},
-            wins        = #{wins},
-            games       = #{games},
-            updated_at  = NOW()
+        SET name         = #{name},
+            team         = #{team},
+            position     = #{position},
+            player_type  = #{playerType},
+            batting_avg  = #{battingAvg},
+            home_runs    = #{homeRuns},
+            hits         = #{hits},
+            rbi          = #{rbi},
+            stolen_bases = #{stolenBases},
+            era          = #{era},
+            wins         = #{wins},
+            saves        = #{saves},
+            holds        = #{holds},
+            games        = #{games},
+            updated_at   = NOW()
         WHERE id = #{id}
+    </update>
+
+    <!-- 세이브/홀드 단건 업데이트 (구원투수 크롤링용) -->
+    <update id="updateSavesAndHolds">
+        UPDATE player
+        SET saves      = #{saves},
+            holds      = #{holds},
+            updated_at = NOW()
+        WHERE name = #{name}
+          AND team = #{team}
+          AND player_type = 'PITCHER'
+    </update>
+
+    <!-- 도루 단건 업데이트 (도루 크롤링용) -->
+    <update id="updateStolenBases">
+        UPDATE player
+        SET stolen_bases = #{stolenBases},
+            updated_at   = NOW()
+        WHERE name = #{name}
+          AND team = #{team}
+          AND player_type = 'BATTER'
     </update>
 
     <!-- 삭제 -->
@@ -168,6 +195,38 @@
         WHERE player_type = 'PITCHER'
           AND wins IS NOT NULL
         ORDER BY wins DESC
+        LIMIT #{limit}
+    </select>
+
+    <!-- 도루 랭킹 -->
+    <select id="findStolenBasesRanking" resultMap="PlayerResultMap">
+        SELECT <include refid="selectColumns"/>
+        FROM player
+        WHERE player_type = 'BATTER'
+          AND stolen_bases IS NOT NULL
+        ORDER BY stolen_bases DESC
+        LIMIT #{limit}
+    </select>
+
+    <!-- 세이브 랭킹 -->
+    <select id="findSavesRanking" resultMap="PlayerResultMap">
+        SELECT <include refid="selectColumns"/>
+        FROM player
+        WHERE player_type = 'PITCHER'
+          AND saves IS NOT NULL
+          AND saves > 0
+        ORDER BY saves DESC
+        LIMIT #{limit}
+    </select>
+
+    <!-- 홀드 랭킹 -->
+    <select id="findHoldsRanking" resultMap="PlayerResultMap">
+        SELECT <include refid="selectColumns"/>
+        FROM player
+        WHERE player_type = 'PITCHER'
+          AND holds IS NOT NULL
+          AND holds > 0
+        ORDER BY holds DESC
         LIMIT #{limit}
     </select>
 
