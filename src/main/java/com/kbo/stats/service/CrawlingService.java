@@ -36,7 +36,7 @@ public class CrawlingService {
 
     private static final int CURRENT_SEASON = 2026;
     private static final long TABLE_WAIT_SECONDS = 20;
-    private static final long PAGE_DELAY_MS = 2_000;
+    private static final long PAGE_DELAY_MS = 1_000;
 
     private static final String KBO_BATTER_URL =
             "https://www.koreabaseball.com/Record/Player/HitterBasic/Basic1.aspx";
@@ -55,19 +55,26 @@ public class CrawlingService {
     public void crawlAll() {
         log.info("=== KBO 크롤링 시작 (시즌: {}) ===", CURRENT_SEASON);
         playerService.deleteAll();
-        int batterCount  = crawlKbo(KBO_BATTER_URL,  PlayerType.BATTER,  "타자");
-        crawlBatterStolenBases();
-        int pitcherCount = crawlKbo(KBO_PITCHER_URL, PlayerType.PITCHER, "투수");
-        crawlSavesAndHolds();
+        WebDriver driver = null;
+        int batterCount = 0, pitcherCount = 0;
+        try {
+            driver = createDriver();
+            batterCount  = crawlKbo(driver, KBO_BATTER_URL,  PlayerType.BATTER,  "타자");
+            crawlBatterStolenBases(driver);
+            pitcherCount = crawlKbo(driver, KBO_PITCHER_URL, PlayerType.PITCHER, "투수");
+            crawlSavesAndHolds(driver);
+        } finally {
+            if (driver != null) {
+                try { driver.quit(); } catch (Exception ignored) {}
+            }
+        }
         log.info("=== KBO 크롤링 완료 | 타자: {}명, 투수: {}명 ===", batterCount, pitcherCount);
     }
 
-    private int crawlKbo(String url, PlayerType playerType, String label) {
+    private int crawlKbo(WebDriver driver, String url, PlayerType playerType, String label) {
         List<Player> players = new ArrayList<>();
-        WebDriver driver = null;
         try {
-            driver = createDriver();
-            log.info("[{}] 브라우저 오픈 → {}", label, url);
+            log.info("[{}] 브라우저 이동 → {}", label, url);
             driver.get(url);
 
             WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(TABLE_WAIT_SECONDS));
@@ -95,10 +102,6 @@ public class CrawlingService {
             log.warn("[{}] 인터럽트 → 크롤링 중단 (수집: {}명)", label, players.size());
         } catch (Exception e) {
             log.error("[{}] 크롤링 실패: {} (수집: {}명)", label, e.getMessage(), players.size(), e);
-        } finally {
-            if (driver != null) {
-                try { driver.quit(); } catch (Exception ignored) {}
-            }
         }
         return players.size();
     }
@@ -179,7 +182,7 @@ public class CrawlingService {
         } catch (Exception e) {
             Thread.sleep(PAGE_DELAY_MS);
         }
-        Thread.sleep(500);
+        Thread.sleep(300);
         return true;
     }
 
@@ -262,12 +265,10 @@ public class CrawlingService {
     }
 
     // 도루 페이지 컬럼: 순위(0) 선수명(1) 팀명(2) G(3) SB(4) SBA(5) SBP(6) CS(7)
-    private void crawlBatterStolenBases() {
+    private void crawlBatterStolenBases(WebDriver driver) {
         log.info("[도루] 크롤링 시작 → {}", KBO_BATTER_STEAL_URL);
-        WebDriver driver = null;
         int count = 0;
         try {
-            driver = createDriver();
             driver.get(KBO_BATTER_STEAL_URL);
 
             WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(TABLE_WAIT_SECONDS));
@@ -302,22 +303,16 @@ public class CrawlingService {
             log.warn("[도루] 인터럽트 → 중단 (처리: {}명)", count);
         } catch (Exception e) {
             log.error("[도루] 크롤링 실패: {} (처리: {}명)", e.getMessage(), count, e);
-        } finally {
-            if (driver != null) {
-                try { driver.quit(); } catch (Exception ignored) {}
-            }
         }
         log.info("[도루] 크롤링 완료 ({}명 업데이트)", count);
     }
 
     // 세이브 정렬 페이지에서 구원투수 세이브/홀드 upsert
     // 컬럼: 순위(0) 선수명(1) 팀명(2) ERA(3) G(4) W(5) L(6) SV(7) HLD(8)
-    private void crawlSavesAndHolds() {
+    private void crawlSavesAndHolds(WebDriver driver) {
         log.info("[세이브/홀드] 크롤링 시작 → {}", KBO_PITCHER_SAVE_URL);
-        WebDriver driver = null;
         int count = 0;
         try {
-            driver = createDriver();
             driver.get(KBO_PITCHER_SAVE_URL);
 
             WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(TABLE_WAIT_SECONDS));
@@ -357,10 +352,6 @@ public class CrawlingService {
             log.warn("[세이브/홀드] 인터럽트 → 중단 (처리: {}명)", count);
         } catch (Exception e) {
             log.error("[세이브/홀드] 크롤링 실패: {} (처리: {}명)", e.getMessage(), count, e);
-        } finally {
-            if (driver != null) {
-                try { driver.quit(); } catch (Exception ignored) {}
-            }
         }
         log.info("[세이브/홀드] 크롤링 완료 ({}명 upsert)", count);
     }
