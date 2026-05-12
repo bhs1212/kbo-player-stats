@@ -20,7 +20,9 @@
       "PowerShell(mvn *)",
       "PowerShell(Start-Process -FilePath \"mvn\" -ArgumentList \"spring-boot:run\" -WorkingDirectory \"C:\\\\Develops\\\\kbo-player-stats\" -RedirectStandardOutput \"C:\\\\Develops\\\\kbo-player-stats\\\\app.log\" -RedirectStandardError \"C:\\\\Develops\\\\kbo-player-stats\\\\app-err.log\" -NoNewWindow)",
       "PowerShell(Get-Process *)",
-      "PowerShell(Start-Process -FilePath \"mvn\" -ArgumentList \"clean\", \"spring-boot:run\" -WorkingDirectory \"C:\\\\Develops\\\\kbo-player-stats\" -RedirectStandardOutput \"C:\\\\Develops\\\\kbo-player-stats\\\\app.log\" -RedirectStandardError \"C:\\\\Develops\\\\kbo-player-stats\\\\app-err.log\" -NoNewWindow)"
+      "PowerShell(Start-Process -FilePath \"mvn\" -ArgumentList \"clean\", \"spring-boot:run\" -WorkingDirectory \"C:\\\\Develops\\\\kbo-player-stats\" -RedirectStandardOutput \"C:\\\\Develops\\\\kbo-player-stats\\\\app.log\" -RedirectStandardError \"C:\\\\Develops\\\\kbo-player-stats\\\\app-err.log\" -NoNewWindow)",
+      "Read(//mnt/c/Develops/**)",
+      "Bash(./mvnw compile *)"
     ]
   }
 }

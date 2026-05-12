@@ -19,10 +19,13 @@ import org.openqa.selenium.support.ui.ExpectedConditions;
 import org.openqa.selenium.support.ui.Select;
 import org.openqa.selenium.support.ui.WebDriverWait;
 import org.springframework.stereotype.Service;
+import org.springframework.util.StopWatch;
 
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 @Slf4j
 @Service
@@ -35,8 +38,8 @@ public class CrawlingService {
             "Chrome/124.0.0.0 Safari/537.36";
 
     private static final int CURRENT_SEASON = 2026;
-    private static final long TABLE_WAIT_SECONDS = 20;
-    private static final long PAGE_DELAY_MS = 1_000;
+    private static final long TABLE_WAIT_SECONDS = 10;
+    private static final long PAGE_DELAY_MS = 300;
 
     private static final String KBO_BATTER_URL =
             "https://www.koreabaseball.com/Record/Player/HitterBasic/Basic1.aspx";
@@ -57,16 +60,34 @@ public class CrawlingService {
         playerService.deleteAll();
         WebDriver driver = null;
         int batterCount = 0, pitcherCount = 0;
+        StopWatch sw = new StopWatch("KBO 크롤링");
         try {
+            sw.start("드라이버 생성");
             driver = createDriver();
+            sw.stop();
+
+            sw.start("타자 크롤링");
             batterCount  = crawlKbo(driver, KBO_BATTER_URL,  PlayerType.BATTER,  "타자");
+            sw.stop();
+
+            sw.start("도루 크롤링");
             crawlBatterStolenBases(driver);
+            sw.stop();
+
+            sw.start("투수 크롤링");
             pitcherCount = crawlKbo(driver, KBO_PITCHER_URL, PlayerType.PITCHER, "투수");
+            sw.stop();
+
+            sw.start("세이브/홀드 크롤링");
             crawlSavesAndHolds(driver);
+            sw.stop();
         } finally {
             if (driver != null) {
                 try { driver.quit(); } catch (Exception ignored) {}
             }
+            if (sw.isRunning()) sw.stop();
+            log.info("\n{}", sw.prettyPrint());
+            log.info("총 소요시간: {}초", String.format("%.1f", sw.getTotalTimeSeconds()));
         }
         log.info("=== KBO 크롤링 완료 | 타자: {}명, 투수: {}명 ===", batterCount, pitcherCount);
     }
@@ -182,7 +203,6 @@ public class CrawlingService {
         } catch (Exception e) {
             Thread.sleep(PAGE_DELAY_MS);
         }
-        Thread.sleep(300);
         return true;
     }
 
@@ -310,17 +330,54 @@ public class CrawlingService {
     // 세이브 정렬 페이지에서 구원투수 세이브/홀드 upsert
     // 컬럼: 순위(0) 선수명(1) 팀명(2) ERA(3) G(4) W(5) L(6) SV(7) HLD(8)
     private void crawlSavesAndHolds(WebDriver driver) {
-        log.info("[세이브/홀드] 크롤링 시작 → {}", KBO_PITCHER_SAVE_URL);
+        log.info("[세이브/홀드] 크롤링 시작 (투수 페이지에서 SV 정렬)");
         int count = 0;
         try {
-            driver.get(KBO_PITCHER_SAVE_URL);
-
             WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(TABLE_WAIT_SECONDS));
-            wait.until(ExpectedConditions.presenceOfElementLocated(By.cssSelector(TABLE_ROW_SEL)));
-            Thread.sleep(PAGE_DELAY_MS);
 
-            selectSeason(driver, wait, "세이브/홀드");
-            selectAllPitchers(driver, wait);
+            // 현재 투수 페이지에서 SV 컬럼 헤더 클릭으로 정렬 변경
+            boolean sorted = false;
+            try {
+                String prevFirstRow = driver.findElement(By.cssSelector(TABLE_ROW_SEL)).getText().trim();
+                WebElement svLink = null;
+                for (WebElement th : driver.findElements(By.cssSelector("table.tData01 thead th, table.tData01 th"))) {
+                    if ("SV".equals(th.getText().trim())) {
+                        try {
+                            svLink = th.findElement(By.tagName("a"));
+                        } catch (Exception e) {
+                            svLink = th;
+                        }
+                        break;
+                    }
+                }
+                if (svLink != null) {
+                    try {
+                        svLink.click();
+                    } catch (Exception e) {
+                        ((JavascriptExecutor) driver).executeScript("arguments[0].click();", svLink);
+                    }
+                    wait.until(d -> {
+                        try {
+                            String cur = d.findElement(By.cssSelector(TABLE_ROW_SEL)).getText().trim();
+                            return !cur.isEmpty() && !cur.equals(prevFirstRow);
+                        } catch (Exception ex) {
+                            return false;
+                        }
+                    });
+                    sorted = true;
+                    log.info("[세이브/홀드] SV 헤더 클릭으로 정렬 완료");
+                } else {
+                    log.warn("[세이브/홀드] SV 헤더를 찾지 못함 → fallback URL 사용");
+                }
+            } catch (Exception e) {
+                log.warn("[세이브/홀드] SV 헤더 클릭 실패 → fallback URL 사용: {}", e.getMessage());
+            }
+
+            if (!sorted) {
+                driver.get(KBO_PITCHER_SAVE_URL);
+                wait.until(ExpectedConditions.presenceOfElementLocated(By.cssSelector(TABLE_ROW_SEL)));
+                Thread.sleep(PAGE_DELAY_MS);
+            }
 
             for (int page = 1; ; page++) {
                 Document doc = Jsoup.parse(driver.getPageSource());
@@ -498,6 +555,11 @@ public class CrawlingService {
         options.addArguments("--window-size=1920,1080");
         options.addArguments("--lang=ko-KR,ko;q=0.9");
         options.addArguments("user-agent=" + USER_AGENT);
+        options.addArguments("--blink-settings=imagesEnabled=false");
+        Map<String, Object> prefs = new HashMap<>();
+        prefs.put("profile.managed_default_content_settings.images", 2);
+        prefs.put("profile.managed_default_content_settings.stylesheets", 2);
+        options.setExperimentalOption("prefs", prefs);
         ChromeDriver driver = new ChromeDriver(options);
         driver.manage().timeouts().pageLoadTimeout(Duration.ofSeconds(30));
         return driver;
