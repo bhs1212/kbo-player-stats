@@ -1,12 +1,14 @@
 package com.kbo.stats.controller;
 
 import com.kbo.stats.service.CrawlingService;
+import io.swagger.v3.oas.annotations.Hidden;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
+@Hidden
 @Controller
 @RequestMapping("/crawling")
 @RequiredArgsConstructor

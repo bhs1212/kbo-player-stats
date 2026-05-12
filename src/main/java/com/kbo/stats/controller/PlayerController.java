@@ -7,6 +7,7 @@ import com.kbo.stats.dto.PlayerFormDto;
 import com.kbo.stats.dto.PlayerSearchDto;
 import com.kbo.stats.service.CsvImportService;
 import com.kbo.stats.service.PlayerService;
+import io.swagger.v3.oas.annotations.Hidden;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Controller;
@@ -19,6 +20,7 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 import java.io.IOException;
 import java.util.List;
 
+@Hidden
 @Controller
 @RequestMapping("/players")
 @RequiredArgsConstructor

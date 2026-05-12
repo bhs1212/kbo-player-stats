@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org"
+      th:replace="~{layout/base :: base(
+          title='KBO 챗봇',
+          content=~{::main-content},
+          extraHead=~{::chat-style},
+          extraScript=~{::chat-script})}">
+<head><title>KBO 챗봇</title></head>
+<body>
+
+<th:block th:fragment="chat-style">
+<style>
+  .chat-container {
+    max-width: 760px;
+    margin: 0 auto;
+  }
+  .chat-messages {
+    min-height: 420px;
+    max-height: 560px;
+    overflow-y: auto;
+    background: #fff;
+    border: 1px solid #dee2e6;
+    border-radius: 12px;
+    padding: 1.25rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+  .message-row {
+    display: flex;
+    align-items: flex-end;
+    gap: 0.5rem;
+  }
+  .message-row.user {
+    flex-direction: row-reverse;
+  }
+  .bubble {
+    max-width: 72%;
+    padding: 0.6rem 1rem;
+    border-radius: 18px;
+    font-size: 0.925rem;
+    line-height: 1.55;
+    word-break: break-word;
+    white-space: pre-wrap;
+  }
+  .bubble.user {
+    background: #0d6efd;
+    color: #fff;
+    border-bottom-right-radius: 4px;
+  }
+  .bubble.bot {
+    background: #f1f3f5;
+    color: #212529;
+    border-bottom-left-radius: 4px;
+  }
+  .bubble.error {
+    background: #fff3f3;
+    color: #dc3545;
+    border: 1px solid #f5c2c7;
+    border-bottom-left-radius: 4px;
+  }
+  .avatar {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1rem;
+    flex-shrink: 0;
+  }
+  .avatar.bot {
+    background: #0d6efd;
+    color: #fff;
+  }
+  .avatar.user {
+    background: #6c757d;
+    color: #fff;
+  }
+  .typing-dot {
+    display: inline-block;
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: #868e96;
+    animation: blink 1.2s infinite;
+  }
+  .typing-dot:nth-child(2) { animation-delay: 0.2s; }
+  .typing-dot:nth-child(3) { animation-delay: 0.4s; }
+  @keyframes blink {
+    0%, 80%, 100% { opacity: 0.2; }
+    40% { opacity: 1; }
+  }
+  .chat-input-area {
+    background: #fff;
+    border: 1px solid #dee2e6;
+    border-radius: 12px;
+    padding: 0.75rem 1rem;
+    display: flex;
+    gap: 0.5rem;
+    align-items: flex-end;
+  }
+  #questionInput {
+    resize: none;
+    border: none;
+    outline: none;
+    flex: 1;
+    font-size: 0.95rem;
+    max-height: 120px;
+    overflow-y: auto;
+    line-height: 1.5;
+  }
+  #sendBtn {
+    flex-shrink: 0;
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.1rem;
+  }
+  .example-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+  }
+  .example-chip {
+    cursor: pointer;
+    font-size: 0.82rem;
+    padding: 0.3rem 0.75rem;
+    border-radius: 20px;
+    border: 1px solid #0d6efd;
+    color: #0d6efd;
+    background: #fff;
+    transition: all 0.15s;
+  }
+  .example-chip:hover {
+    background: #0d6efd;
+    color: #fff;
+  }
+</style>
+</th:block>
+
+<th:block th:fragment="main-content">
+<div class="chat-container">
+  <!-- 헤더 -->
+  <div class="mb-3">
+    <h4 class="mb-1">
+      <i class="bi bi-robot text-primary"></i> KBO 챗봇
+    </h4>
+    <p class="text-muted mb-0" style="font-size:0.9rem;">
+      선수 기록을 자연어로 물어보세요. 예) "홈런 많이 친 타자 알려줘", "류현진 기록은?"
+    </p>
+  </div>
+
+  <!-- 예시 질문 칩 -->
+  <div class="example-chips mb-3">
+    <span class="example-chip" onclick="fillQuestion(this)">홈런 TOP5 알려줘</span>
+    <span class="example-chip" onclick="fillQuestion(this)">방어율 좋은 투수 3명</span>
+    <span class="example-chip" onclick="fillQuestion(this)">타율 높은 선수는?</span>
+    <span class="example-chip" onclick="fillQuestion(this)">세이브 랭킹 보여줘</span>
+    <span class="example-chip" onclick="fillQuestion(this)">한화 선수 알려줘</span>
+  </div>
+
+  <!-- 메시지 영역 -->
+  <div class="chat-messages mb-3" id="chatMessages">
+    <!-- 환영 메시지 -->
+    <div class="message-row">
+      <div class="avatar bot"><i class="bi bi-robot"></i></div>
+      <div class="bubble bot">안녕하세요! KBO 선수 기록 챗봇입니다 ⚾<br>궁금한 선수나 기록을 자유롭게 물어보세요.</div>
+    </div>
+  </div>
+
+  <!-- 입력 영역 -->
+  <div class="chat-input-area">
+    <textarea id="questionInput" rows="1" placeholder="질문을 입력하세요..."></textarea>
+    <button id="sendBtn" class="btn btn-primary" onclick="sendMessage()">
+      <i class="bi bi-send-fill"></i>
+    </button>
+  </div>
+</div>
+</th:block>
+
+<th:block th:fragment="chat-script">
+<script>
+  const messagesEl = document.getElementById('chatMessages');
+  const inputEl = document.getElementById('questionInput');
+  const sendBtn = document.getElementById('sendBtn');
+
+  // textarea 자동 높이 조절
+  inputEl.addEventListener('input', function () {
+    this.style.height = 'auto';
+    this.style.height = Math.min(this.scrollHeight, 120) + 'px';
+  });
+
+  // Enter = 전송, Shift+Enter = 줄바꿈
+  inputEl.addEventListener('keydown', function (e) {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      sendMessage();
+    }
+  });
+
+  function fillQuestion(el) {
+    inputEl.value = el.textContent;
+    inputEl.focus();
+    inputEl.dispatchEvent(new Event('input'));
+  }
+
+  function appendMessage(content, type) {
+    const row = document.createElement('div');
+    row.className = 'message-row' + (type === 'user' ? ' user' : '');
+
+    if (type !== 'user') {
+      const avatar = document.createElement('div');
+      avatar.className = 'avatar bot';
+      avatar.innerHTML = '<i class="bi bi-robot"></i>';
+      row.appendChild(avatar);
+    }
+
+    const bubble = document.createElement('div');
+    bubble.className = 'bubble ' + type;
+    bubble.textContent = content;
+    row.appendChild(bubble);
+
+    if (type === 'user') {
+      const avatar = document.createElement('div');
+      avatar.className = 'avatar user';
+      avatar.innerHTML = '<i class="bi bi-person-fill"></i>';
+      row.appendChild(avatar);
+    }
+
+    messagesEl.appendChild(row);
+    messagesEl.scrollTop = messagesEl.scrollHeight;
+    return bubble;
+  }
+
+  function appendTyping() {
+    const row = document.createElement('div');
+    row.className = 'message-row';
+    row.id = 'typingRow';
+
+    const avatar = document.createElement('div');
+    avatar.className = 'avatar bot';
+    avatar.innerHTML = '<i class="bi bi-robot"></i>';
+    row.appendChild(avatar);
+
+    const bubble = document.createElement('div');
+    bubble.className = 'bubble bot';
+    bubble.innerHTML = '<span class="typing-dot"></span><span class="typing-dot"></span><span class="typing-dot"></span>';
+    row.appendChild(bubble);
+
+    messagesEl.appendChild(row);
+    messagesEl.scrollTop = messagesEl.scrollHeight;
+  }
+
+  function removeTyping() {
+    const el = document.getElementById('typingRow');
+    if (el) el.remove();
+  }
+
+  async function sendMessage() {
+    const question = inputEl.value.trim();
+    if (!question) return;
+
+    // 입력창 초기화 및 버튼 비활성화
+    inputEl.value = '';
+    inputEl.style.height = 'auto';
+    sendBtn.disabled = true;
+
+    appendMessage(question, 'user');
+    appendTyping();
+
+    try {
+      const res = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ question })
+      });
+
+      const json = await res.json();
+      removeTyping();
+
+      if (res.ok && json.success) {
+        appendMessage(json.data.answer, 'bot');
+      } else {
+        const msg = json.message || '오류가 발생했습니다. 다시 시도해주세요.';
+        appendMessage(msg, 'error');
+      }
+    } catch (err) {
+      removeTyping();
+      appendMessage('서버 연결에 실패했습니다. 잠시 후 다시 시도해주세요.', 'error');
+    } finally {
+      sendBtn.disabled = false;
+      inputEl.focus();
+    }
+  }
+</script>
+</th:block>
+
+</body>
+</html>

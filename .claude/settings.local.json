@@ -22,7 +22,10 @@
       "PowerShell(Get-Process *)",
       "PowerShell(Start-Process -FilePath \"mvn\" -ArgumentList \"clean\", \"spring-boot:run\" -WorkingDirectory \"C:\\\\Develops\\\\kbo-player-stats\" -RedirectStandardOutput \"C:\\\\Develops\\\\kbo-player-stats\\\\app.log\" -RedirectStandardError \"C:\\\\Develops\\\\kbo-player-stats\\\\app-err.log\" -NoNewWindow)",
       "Read(//mnt/c/Develops/**)",
-      "Bash(./mvnw compile *)"
+      "Bash(./mvnw compile *)",
+      "Bash(mvn spring-boot:run *)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:8080/chat)",
+      "Bash(start *)"
     ]
   }
 }

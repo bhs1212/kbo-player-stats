@@ -2,6 +2,7 @@ package com.kbo.stats.dto;
 
 import com.kbo.stats.domain.Player;
 import com.kbo.stats.domain.PlayerType;
+import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import lombok.Data;
@@ -9,17 +10,22 @@ import lombok.Data;
 @Data
 public class PlayerFormDto {
 
+    @Schema(description = "선수 ID (수정 시 사용)")
     private Long id;
 
+    @Schema(description = "선수명", example = "이정후")
     @NotBlank(message = "선수명을 입력하세요.")
     private String name;
 
+    @Schema(description = "팀명", example = "한화")
     @NotBlank(message = "팀명을 입력하세요.")
     private String team;
 
+    @Schema(description = "포지션", example = "외야수")
     @NotBlank(message = "포지션을 입력하세요.")
     private String position;
 
+    @Schema(description = "선수 유형", example = "BATTER")
     @NotNull(message = "선수 구분을 선택하세요.")
     private PlayerType playerType;
 
