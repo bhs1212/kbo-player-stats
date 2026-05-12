@@ -7,6 +7,7 @@ import com.kbo.stats.mapper.PlayerMapper;
 import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.core.io.ResourceLoader;
 import org.springframework.stereotype.Service;
 
@@ -43,7 +44,11 @@ public class ChatService {
         }
     }
 
+    // 질문을 소문자+trim 정규화하여 캐시 키로 사용 → 공백·대소문자 차이 무시
+    @Cacheable(value = "chatAnswers", key = "#question.toLowerCase().trim()")
     public ChatResponseDto answer(String question) {
+        log.info("LLM 호출 시작 (캐시 미스): question={}", question);
+
         // 1단계: 의도 추출
         log.debug("의도 추출 시작 - 질문: {}", question);
         String intentJson = claudeApiClient.complete(intentExtractionPrompt, question);
