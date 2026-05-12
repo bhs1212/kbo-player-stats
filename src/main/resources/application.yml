@@ -22,6 +22,9 @@ logging:
   level:
     com.kbo.stats: DEBUG
     org.mybatis: DEBUG
+  charset:
+    console: UTF-8
+    file: UTF-8
 
 server:
   port: 8080
@@ -34,8 +37,8 @@ claude:
 
 chat:
   rate-limit:
-    per-minute-per-ip: 10   # IP당 분당 최대 요청 수
-    daily-total: 500         # 전체 일일 최대 요청 수
+    per-minute-per-ip: 10 # IP당 분당 최대 요청 수
+    daily-total: 500 # 전체 일일 최대 요청 수
 
 springdoc:
   api-docs:
