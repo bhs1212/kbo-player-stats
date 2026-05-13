@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="ko" xmlns:th="http://www.thymeleaf.org"
+<html lang="ko" xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security"
       th:replace="~{layout/base :: base(
           title=${player.name},
           content=~{::main-content},
@@ -16,7 +16,8 @@
             <li class="breadcrumb-item active" th:text="${player.name}"></li>
         </ol>
     </nav>
-    <div class="d-flex gap-2">
+    <!-- 관리자 전용 수정/삭제 버튼 -->
+    <div class="d-flex gap-2" sec:authorize="hasRole('ADMIN')">
         <a th:href="@{/players/{id}/edit(id=${player.id})}" class="btn btn-warning btn-sm">
             <i class="bi bi-pencil"></i> 수정
         </a>
