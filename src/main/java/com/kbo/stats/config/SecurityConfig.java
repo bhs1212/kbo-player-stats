@@ -1,15 +1,11 @@
 package com.kbo.stats.config;
 
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
-import org.springframework.security.core.userdetails.User;
-import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
-import org.springframework.security.provisioning.InMemoryUserDetailsManager;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.util.matcher.AntPathRequestMatcher;
 
@@ -17,28 +13,13 @@ import org.springframework.security.web.util.matcher.AntPathRequestMatcher;
 @EnableWebSecurity
 public class SecurityConfig {
 
-    @Value("${admin.username}")
-    private String adminUsername;
-
-    @Value("${admin.password}")
-    private String adminPassword;
-
-    /** BCrypt 패스워드 인코더 */
+    /** BCrypt 패스워드 인코더 (UserAccountService, CustomUserDetailsService 에서 주입) */
     @Bean
     public PasswordEncoder passwordEncoder() {
         return new BCryptPasswordEncoder();
     }
 
-    /** 인메모리 관리자 계정 등록 */
-    @Bean
-    public UserDetailsService userDetailsService(PasswordEncoder encoder) {
-        var admin = User.builder()
-                .username(adminUsername)
-                .password(encoder.encode(adminPassword))
-                .roles("ADMIN")
-                .build();
-        return new InMemoryUserDetailsManager(admin);
-    }
+    // UserDetailsService 빈은 CustomUserDetailsService (@Service) 가 자동 등록됨
 
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
@@ -54,6 +35,7 @@ public class SecurityConfig {
                 .requestMatchers(
                     "/",
                     "/login",
+                    "/signup",
                     "/error",
                     "/css/**", "/js/**", "/images/**", "/webjars/**",
                     "/swagger-ui/**", "/swagger-ui.html",
@@ -62,8 +44,10 @@ public class SecurityConfig {
                 // 챗봇 POST - Rate Limit으로 보호 중이므로 공개 허용
                 .requestMatchers(new AntPathRequestMatcher("/api/chat", "POST")).permitAll()
 
+                // ── 회원 전용 경로 ──
+                .requestMatchers("/my/**").hasAnyRole("USER", "ADMIN")
+
                 // ── 관리자 전용 경로 (GET 전체 허용보다 먼저 선언해야 함) ──
-                // PlayerController 변경 작업 (GET /new, GET /{id}/edit)
                 .requestMatchers(
                     new AntPathRequestMatcher("/players/new", "GET"),
                     new AntPathRequestMatcher("/players/*/edit", "GET"),
@@ -101,6 +85,12 @@ public class SecurityConfig {
                 .logoutUrl("/logout")
                 .logoutSuccessUrl("/")
                 .permitAll()
+            )
+            // 권한 부족(403) 시 홈으로 리다이렉트 (비로그인 → /login 은 Spring Security 기본 처리)
+            .exceptionHandling(exception -> exception
+                .accessDeniedHandler((request, response, accessDeniedException) ->
+                    response.sendRedirect(request.getContextPath() + "/players?accessDenied=true")
+                )
             )
             // HTTP Basic 활성화 (Swagger UI / REST 테스트 편의)
             .httpBasic(basic -> {});

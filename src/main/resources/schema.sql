@@ -34,7 +34,13 @@ CREATE TABLE IF NOT EXISTS player (
     INDEX idx_player_name (name)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='KBO 선수 기록';
 
--- 기존 테이블에 새 컬럼 추가 (이미 존재하면 무시)
-ALTER TABLE player ADD COLUMN IF NOT EXISTS stolen_bases INT DEFAULT NULL COMMENT '도루' AFTER rbi;
-ALTER TABLE player ADD COLUMN IF NOT EXISTS saves        INT DEFAULT NULL COMMENT '세이브' AFTER wins;
-ALTER TABLE player ADD COLUMN IF NOT EXISTS holds        INT DEFAULT NULL COMMENT '홀드' AFTER saves;
+
+-- 일반 사용자 계정 테이블 (MySQL 예약어 충돌 방지를 위해 user_account로 명명)
+CREATE TABLE IF NOT EXISTS user_account (
+    id            BIGINT PRIMARY KEY AUTO_INCREMENT,
+    username      VARCHAR(20)  NOT NULL UNIQUE COMMENT '사용자 아이디',
+    password      VARCHAR(255) NOT NULL         COMMENT 'BCrypt 해시된 비밀번호',
+    favorite_team VARCHAR(20)  NOT NULL         COMMENT '응원 팀',
+    role          VARCHAR(20)  NOT NULL DEFAULT 'USER' COMMENT '권한(USER/ADMIN)',
+    created_at    TIMESTAMP    DEFAULT CURRENT_TIMESTAMP COMMENT '가입일'
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='일반 회원 계정';

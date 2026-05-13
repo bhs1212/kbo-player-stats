@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="ko"
+      xmlns:th="http://www.thymeleaf.org"
+      th:replace="~{layout/base :: base(
+          '마이페이지',
+          ~{::main-content},
+          ~{},
+          ~{}
+      )}">
+<body>
+<th:block th:fragment="main-content">
+    <div class="row justify-content-center">
+        <div class="col-md-8 col-lg-6">
+            <h2 class="mb-4">
+                <i class="bi bi-person-circle me-2"></i>마이페이지
+            </h2>
+
+            <!-- 성공 메시지는 base.html 레이아웃에서 처리 -->
+
+            <!-- 사용자 정보 카드 -->
+            <div class="card mb-4">
+                <div class="card-header fw-semibold">
+                    <i class="bi bi-info-circle me-1"></i> 내 정보
+                </div>
+                <div class="card-body">
+                    <dl class="row mb-0">
+                        <dt class="col-4 text-muted">아이디</dt>
+                        <dd class="col-8" th:text="${user.username}"></dd>
+
+                        <dt class="col-4 text-muted">응원 팀</dt>
+                        <dd class="col-8">
+                            <span class="badge bg-primary fs-6" th:text="${user.favoriteTeam}"></span>
+                        </dd>
+
+                        <dt class="col-4 text-muted">가입일</dt>
+                        <dd class="col-8"
+                            th:text="${#temporals.format(user.createdAt, 'yyyy년 MM월 dd일')}"></dd>
+                    </dl>
+                </div>
+            </div>
+
+            <!-- 응원팀 변경 폼 -->
+            <div class="card mb-4">
+                <div class="card-header fw-semibold">
+                    <i class="bi bi-star-fill me-1 text-warning"></i> 응원 팀 변경
+                </div>
+                <div class="card-body">
+                    <form th:action="@{/my/profile/team}" method="post">
+                        <div class="mb-3">
+                            <label for="favoriteTeam" class="form-label">응원 팀 선택</label>
+                            <select id="favoriteTeam" name="favoriteTeam" class="form-select">
+                                <option th:each="team : ${teams}"
+                                        th:value="${team}"
+                                        th:text="${team}"
+                                        th:selected="${team == user.favoriteTeam}">
+                                </option>
+                            </select>
+                        </div>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="bi bi-check-lg me-1"></i> 저장
+                        </button>
+                    </form>
+                </div>
+            </div>
+
+            <!-- 내 팀 선수 보기 링크 -->
+            <div class="d-grid">
+                <a th:href="@{/my/team}" class="btn btn-outline-primary btn-lg">
+                    <i class="bi bi-people-fill me-2"></i>
+                    <span th:text="${user.favoriteTeam} + ' 선수 보기'"></span>
+                </a>
+            </div>
+        </div>
+    </div>
+</th:block>
+</body>
+</html>
