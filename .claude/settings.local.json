@@ -28,7 +28,24 @@
       "Bash(start *)",
       "Bash(curl *)",
       "Bash(mysql *)",
-      "PowerShell(taskkill *)"
+      "PowerShell(taskkill *)",
+      "Bash(mvn dependency:list -q)",
+      "Bash(findstr /i \"selenium\\\\|webdriver\")",
+      "Bash(findstr \"selenium\")",
+      "Bash(findstr \"webdrivermanager\")",
+      "PowerShell(Get-Command *)",
+      "PowerShell(try { $r = Invoke-WebRequest -Uri \"http://localhost:8080/games\" -TimeoutSec 5 -UseBasicParsing; \"HTTP $\\($r.StatusCode\\) - 앱 실행 중\" } catch { \"앱 미실행: $_\" })",
+      "PowerShell(Get-Content C:\\\\Develops\\\\kbo-player-stats\\\\app.log -Tail 80 | Where-Object { $_ -match \"경기 크롤러|KBO|NAVER|game\" })",
+      "PowerShell(Get-Content C:\\\\Develops\\\\kbo-player-stats\\\\app-run.log -Tail 100 | Where-Object { $_ -match \"크롤|KBO|NAVER|게임|Game|game\" })",
+      "PowerShell([System.Environment]::GetEnvironmentVariable\\(\"ADMIN_PASSWORD\"\\); [System.Environment]::GetEnvironmentVariable\\(\"ADMIN_USERNAME\"\\))",
+      "PowerShell(Get-Content C:\\\\Develops\\\\kbo-player-stats\\\\app-run.log -Tail 300 | Select-String \"경기 크롤러|KBO|NAVER|Selenium\" | ForEach-Object { $_.Line })",
+      "PowerShell(Get-Content C:\\\\Develops\\\\kbo-player-stats\\\\app-run.log -Tail 100 | Where-Object { $_ -match \"경기 크롤러|tblSchedule\" } | ForEach-Object { $_.Line } | Select-Object -Last 40)",
+      "PowerShell(Get-Content C:\\\\Develops\\\\kbo-player-stats\\\\app-run.log | Select-String \"15:53\" | ForEach-Object { $_.Line })",
+      "PowerShell(Get-Content C:\\\\Develops\\\\kbo-player-stats\\\\app-run.log | Select-String \"15:55\" | Where-Object { $_ -match \"row\\\\[|KBO\" } | ForEach-Object { $_.Line })",
+      "PowerShell(Get-Content C:\\\\Develops\\\\kbo-player-stats\\\\app-run.log | Select-String \"15:59\" | Where-Object { $_ -match \"경기 크롤러\" } | ForEach-Object { $_.Line })",
+      "PowerShell(Get-Content C:\\\\Develops\\\\kbo-player-stats\\\\app-run.log | Select-String \"Starting KboPlayer|Started KboPlayer\" | Select-Object -Last 5 | ForEach-Object { $_.Line })",
+      "PowerShell(Get-Content C:\\\\Develops\\\\kbo-player-stats\\\\app-run.log | Select-String \"16:05\" | Where-Object { $_ -match \"경기 크롤러\" } | ForEach-Object { $_.Line })",
+      "PowerShell(Get-ChildItem C:\\\\Develops\\\\kbo-player-stats -Name | Where-Object { $_ -match \"mvn|maven|pom\" })"
     ]
   }
 }

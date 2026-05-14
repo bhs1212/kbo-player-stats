@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org"
+      th:replace="~{layout/base :: base(
+          title='경기 상세',
+          content=~{::main-content},
+          extraHead=~{},
+          extraScript=~{})}">
+<head><title>경기 상세</title></head>
+<body>
+<th:block th:fragment="main-content">
+
+<div class="d-flex align-items-center mb-3">
+    <a th:href="@{/games}" class="btn btn-outline-secondary btn-sm me-2">
+        <i class="bi bi-arrow-left"></i> 목록으로
+    </a>
+    <h4 class="mb-0">
+        <i class="bi bi-calendar-event text-primary"></i> 경기 상세
+    </h4>
+</div>
+
+<div class="card shadow-sm" th:if="${game != null}">
+    <div class="card-body p-4">
+        <div class="text-center mb-4">
+            <!-- 날짜·경기장 -->
+            <p class="text-muted mb-1">
+                <span th:text="${#temporals.format(game.gameDate, 'yyyy년 M월 d일')}"></span>
+                <span th:if="${game.gameTime != null}"
+                      th:text="' ' + ${#temporals.format(game.gameTime, 'HH:mm')}"></span>
+                <span th:if="${game.stadium != null and !#strings.isEmpty(game.stadium)}"
+                      th:text="' · ' + ${game.stadium}" class="text-muted"></span>
+            </p>
+            <!-- 상태 -->
+            <span th:switch="${game.status.name()}">
+                <span th:case="'SCHEDULED'"   class="badge bg-primary fs-6">예정</span>
+                <span th:case="'IN_PROGRESS'" class="badge bg-warning text-dark fs-6">진행중</span>
+                <span th:case="'FINISHED'"    class="badge bg-success fs-6">종료</span>
+                <span th:case="'POSTPONED'"   class="badge bg-secondary fs-6">연기</span>
+                <span th:case="'CANCELED'"    class="badge bg-danger fs-6">취소</span>
+            </span>
+        </div>
+
+        <!-- 스코어 보드 -->
+        <div class="row text-center align-items-center">
+            <div class="col-4">
+                <div class="display-6 fw-bold"
+                     th:classappend="${game.awayWin} ? 'text-success'"
+                     th:text="${game.awayTeam}"></div>
+                <small class="text-muted">원정</small>
+                <div th:if="${game.status.name() == 'FINISHED'}"
+                     class="display-5 fw-bold mt-2"
+                     th:classappend="${game.awayWin} ? 'text-success' : 'text-muted'"
+                     th:text="${game.awayScore}"></div>
+            </div>
+            <div class="col-4">
+                <div class="fs-3 text-muted fw-light"
+                     th:text="${game.status.name() == 'FINISHED'} ? ':' : 'VS'"></div>
+            </div>
+            <div class="col-4">
+                <div class="display-6 fw-bold"
+                     th:classappend="${game.homeWin} ? 'text-success'"
+                     th:text="${game.homeTeam}"></div>
+                <small class="text-muted">홈</small>
+                <div th:if="${game.status.name() == 'FINISHED'}"
+                     class="display-5 fw-bold mt-2"
+                     th:classappend="${game.homeWin} ? 'text-success' : 'text-muted'"
+                     th:text="${game.homeScore}"></div>
+            </div>
+        </div>
+
+        <!-- 비고 -->
+        <div th:if="${game.notes != null and !#strings.isEmpty(game.notes)}"
+             class="alert alert-secondary mt-4 mb-0">
+            <i class="bi bi-info-circle me-1"></i>
+            <span th:text="${game.notes}"></span>
+        </div>
+    </div>
+</div>
+
+<!-- Stage 3에서 확장 예정: 경기 기록, 선발 투수, 타순 정보 -->
+
+</th:block>
+</body>
+</html>

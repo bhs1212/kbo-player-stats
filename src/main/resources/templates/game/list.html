@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security"
+      th:replace="~{layout/base :: base(
+          title='경기 일정',
+          content=~{::main-content},
+          extraHead=~{::game-list-css},
+          extraScript=~{})}">
+<head><title>경기 일정</title></head>
+<body>
+
+<th:block th:fragment="game-list-css">
+<style>
+/* ── 홈/원정 구분 (굵기) ── */
+.team-home { font-weight: 600; }
+.team-away { font-weight: 500; }
+/* ── 팀 대표 색상 (홈·원정 공통) ── */
+.team-kia     { color: #EA0029; }
+.team-doosan  { color: #131230; }
+.team-lg      { color: #C30452; }
+.team-ssg     { color: #CE0E2D; }
+.team-samsung { color: #074CA1; }
+.team-kt      { color: #EB1C24; }
+.team-lotte   { color: #041E42; }
+.team-hanwha  { color: #FC4E00; }
+.team-nc      { color: #1D467D; }
+.team-kiwoom  { color: #820024; }
+/* ── 승/패 강조 (색상보다 우선) ── */
+.team-winner  { font-weight: 700 !important; }
+.team-loser   { color: #999 !important; font-weight: 400 !important; }
+</style>
+</th:block>
+<th:block th:fragment="main-content">
+
+<!-- 페이지 헤더 -->
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h4 class="mb-0">
+        <i class="bi bi-calendar3 text-primary"></i> 경기 일정
+        <small class="text-muted fw-normal ms-2 fs-6" th:text="${selectedMonthDisplay}"></small>
+    </h4>
+    <!-- 관리자 전용: 크롤링 버튼 -->
+    <div sec:authorize="hasRole('ADMIN')" class="d-flex gap-2">
+        <form th:action="@{/games/crawl}" method="post" class="d-inline">
+            <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
+            <button type="submit" class="btn btn-outline-info btn-sm"
+                    onclick="return confirm('시즌 전체 경기 데이터를 갱신합니다. 약 2분 소요됩니다. 계속하시겠습니까?')">
+                <i class="bi bi-cloud-download"></i> 데이터 갱신
+            </button>
+        </form>
+    </div>
+</div>
+
+<!-- 월 네비게이션 -->
+<div class="d-flex align-items-center gap-2 mb-3">
+    <!-- 이전 달 -->
+    <a th:if="${prevMonth != null}"
+       th:href="@{/games(month=${prevMonth}, team=${selectedTeam})}"
+       class="btn btn-outline-secondary btn-sm">
+        <i class="bi bi-chevron-left"></i>
+    </a>
+    <span th:if="${prevMonth == null}" class="btn btn-outline-secondary btn-sm disabled">
+        <i class="bi bi-chevron-left"></i>
+    </span>
+
+    <!-- 월 선택 드롭다운 -->
+    <form th:action="@{/games}" method="get" class="d-flex align-items-center gap-1 flex-grow-1">
+        <input type="hidden" name="team" th:value="${selectedTeam}">
+        <select name="month" class="form-select form-select-sm" style="max-width:160px;"
+                onchange="this.form.submit()">
+            <option th:each="opt : ${monthOptions}"
+                    th:value="${opt[0]}"
+                    th:text="${opt[1]}"
+                    th:selected="${opt[0] == selectedMonth}"></option>
+        </select>
+        <span th:if="${isCurrentMonth}" class="badge bg-primary ms-1">이번 달</span>
+    </form>
+
+    <!-- 다음 달 -->
+    <a th:if="${nextMonth != null}"
+       th:href="@{/games(month=${nextMonth}, team=${selectedTeam})}"
+       class="btn btn-outline-secondary btn-sm">
+        <i class="bi bi-chevron-right"></i>
+    </a>
+    <span th:if="${nextMonth == null}" class="btn btn-outline-secondary btn-sm disabled">
+        <i class="bi bi-chevron-right"></i>
+    </span>
+
+    <!-- 이번 달로 이동 -->
+    <a th:if="${!isCurrentMonth}"
+       th:href="@{/games(team=${selectedTeam})}"
+       class="btn btn-outline-primary btn-sm ms-1">
+        <i class="bi bi-house-fill"></i> 이번 달
+    </a>
+</div>
+
+<!-- 팀 필터 -->
+<div class="card mb-4">
+    <div class="card-body py-2">
+        <form th:action="@{/games}" method="get" class="d-flex align-items-center gap-2 flex-wrap">
+            <input type="hidden" name="month" th:value="${selectedMonth}">
+            <label class="form-label mb-0 small text-muted fw-semibold">팀 필터:</label>
+            <select name="team" class="form-select form-select-sm" style="width:auto;">
+                <option value="">전체 팀</option>
+                <option th:each="t : ${teams}"
+                        th:value="${t}"
+                        th:text="${t}"
+                        th:selected="${t == selectedTeam}"></option>
+            </select>
+            <button type="submit" class="btn btn-primary btn-sm">
+                <i class="bi bi-search"></i> 조회
+            </button>
+            <a th:href="@{/games(month=${selectedMonth})}" class="btn btn-outline-secondary btn-sm">초기화</a>
+            <span th:if="${selectedTeam != null and !#strings.isEmpty(selectedTeam)}"
+                  class="badge bg-warning text-dark ms-1">
+                <i class="bi bi-star-fill"></i>
+                <span th:text="${selectedTeam}"></span> 경기만 표시
+            </span>
+        </form>
+    </div>
+</div>
+
+<!-- 경기 없음 -->
+<div th:if="${isEmpty}" class="text-center py-5 text-muted">
+    <i class="bi bi-calendar-x fs-1 d-block mb-3"></i>
+    <h5 class="mb-2">아직 이 달의 일정이 확정되지 않았습니다</h5>
+    <p class="mb-3 small">
+        정규시즌은 3월~9월 초까지 진행되며,<br>
+        포스트시즌 일정은 정규시즌 종료 후 확정됩니다.
+    </p>
+    <small sec:authorize="hasRole('ADMIN')">
+        <a th:href="@{/games/crawl}" class="text-decoration-none">데이터 갱신</a>으로 최신 일정을 가져올 수 있습니다.
+    </small>
+</div>
+
+<!-- 날짜별 경기 목록 -->
+<div th:each="entry : ${gamesByDate}" class="mb-4">
+
+    <!-- 날짜 헤더 -->
+    <div class="d-flex align-items-center mb-2">
+        <h6 class="mb-0 fw-bold text-primary me-2"
+            th:text="${dateLabels[entry.key]}"></h6>
+        <span class="badge bg-secondary rounded-pill"
+              th:text="${entry.value.size()} + '경기'"></span>
+    </div>
+
+    <!-- 경기 카드 목록 -->
+    <div class="row g-2">
+        <div th:each="game : ${entry.value}" class="col-12 col-md-6 col-lg-4">
+            <div class="card h-100 shadow-sm"
+                 th:classappend="${game.status.name() == 'POSTPONED' or game.status.name() == 'CANCELED'} ? 'opacity-50'">
+                <div class="card-body py-2 px-3">
+
+                    <!-- 상태 뱃지 + 경기장 -->
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <span th:switch="${game.status.name()}">
+                            <span th:case="'SCHEDULED'"   class="badge bg-primary">예정</span>
+                            <span th:case="'IN_PROGRESS'" class="badge bg-warning text-dark">진행중</span>
+                            <span th:case="'FINISHED'"    class="badge bg-success">종료</span>
+                            <span th:case="'POSTPONED'"   class="badge bg-secondary">연기</span>
+                            <span th:case="'CANCELED'"    class="badge bg-danger">취소</span>
+                        </span>
+                        <small class="text-muted" th:text="${game.stadium != null ? game.stadium : ''}"></small>
+                    </div>
+
+                    <!-- 팀 vs 스코어 -->
+                    <div class="d-flex align-items-center justify-content-between">
+                        <!-- 원정팀 -->
+                        <div class="text-center" style="min-width:60px;">
+                            <div th:class="${game.awayTeamClass}"
+                                 th:text="${game.awayTeam}"></div>
+                            <small class="text-muted">원정</small>
+                        </div>
+
+                        <!-- 스코어 / vs -->
+                        <div class="text-center px-2">
+                            <div class="fs-5 fw-bold"
+                                 th:classappend="${game.status.name() == 'FINISHED'} ? 'text-dark' : 'text-muted'"
+                                 th:text="${game.resultText}"></div>
+                            <small class="text-muted"
+                                   th:text="${game.gameTime != null} ? ${#temporals.format(game.gameTime, 'HH:mm')} : ''"></small>
+                        </div>
+
+                        <!-- 홈팀 -->
+                        <div class="text-center" style="min-width:60px;">
+                            <div th:class="${game.homeTeamClass}"
+                                 th:text="${game.homeTeam}"></div>
+                            <small class="text-muted">홈</small>
+                        </div>
+                    </div>
+
+                    <!-- 연기/취소 사유 -->
+                    <div th:if="${game.notes != null and !#strings.isEmpty(game.notes)}" class="mt-1">
+                        <small class="text-secondary" th:text="${game.notes}"></small>
+                    </div>
+
+                </div>
+                <!-- 상세 링크 -->
+                <a th:href="@{/games/{id}(id=${game.id})}"
+                   class="stretched-link" aria-label="경기 상세"></a>
+            </div>
+        </div>
+    </div>
+</div>
+
+</th:block>
+</body>
+</html>

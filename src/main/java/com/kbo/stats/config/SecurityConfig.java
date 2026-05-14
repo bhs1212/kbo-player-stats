@@ -66,6 +66,10 @@ public class SecurityConfig {
                 .requestMatchers(
                     new AntPathRequestMatcher("/crawling/run", "POST")
                 ).hasRole("ADMIN")
+                // 경기 일정 크롤링 수동 트리거 (ADMIN 전용)
+                .requestMatchers(
+                    new AntPathRequestMatcher("/games/crawl", "POST")
+                ).hasRole("ADMIN")
 
                 // ── 나머지 GET 요청 전체 공개 허용 (목록·상세·랭킹·통계 등) ──
                 .requestMatchers(new AntPathRequestMatcher("/**", "GET")).permitAll()

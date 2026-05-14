@@ -102,6 +102,11 @@
               </a>
             </li>
             <li class="nav-item">
+              <a class="nav-link" th:href="@{/games}">
+                <i class="bi bi-calendar3"></i> 경기 일정
+              </a>
+            </li>
+            <li class="nav-item">
               <a class="nav-link" th:href="@{/chat}">
                 <i class="bi bi-robot"></i> 챗봇
               </a>
@@ -182,7 +187,7 @@
         role="alert"
       >
         <i class="bi bi-shield-exclamation me-2"></i>
-        해당 페이지에 접근할 권한이 없습니다.
+        관리자 권한이 필요한 페이지입니다.
         <button
           type="button"
           class="btn-close"

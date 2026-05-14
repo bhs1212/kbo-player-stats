@@ -44,3 +44,25 @@ CREATE TABLE IF NOT EXISTS user_account (
     role          VARCHAR(20)  NOT NULL DEFAULT 'USER' COMMENT '권한(USER/ADMIN)',
     created_at    TIMESTAMP    DEFAULT CURRENT_TIMESTAMP COMMENT '가입일'
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='일반 회원 계정';
+
+
+-- 경기 일정/결과 테이블
+CREATE TABLE IF NOT EXISTS game (
+    id          BIGINT PRIMARY KEY AUTO_INCREMENT,
+    game_date   DATE         NOT NULL         COMMENT '경기 날짜',
+    game_time   TIME                          COMMENT '경기 시작 시간',
+    away_team   VARCHAR(20)  NOT NULL         COMMENT '원정팀',
+    home_team   VARCHAR(20)  NOT NULL         COMMENT '홈팀',
+    away_score  INT                           COMMENT '원정팀 점수',
+    home_score  INT                           COMMENT '홈팀 점수',
+    status      VARCHAR(20)  NOT NULL DEFAULT 'SCHEDULED'
+                                             COMMENT '상태 (SCHEDULED/IN_PROGRESS/FINISHED/POSTPONED/CANCELED)',
+    stadium     VARCHAR(50)                   COMMENT '경기장',
+    notes       VARCHAR(200)                  COMMENT '비고 (우천 취소 사유 등)',
+    created_at  TIMESTAMP    DEFAULT CURRENT_TIMESTAMP         COMMENT '등록일',
+    updated_at  TIMESTAMP    DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '수정일',
+
+    UNIQUE KEY uk_game (game_date, away_team, home_team),
+    INDEX idx_game_date   (game_date),
+    INDEX idx_game_status (status)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='KBO 경기 일정 및 결과';

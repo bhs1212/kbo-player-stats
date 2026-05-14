@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.kbo.stats.mapper.GameMapper">
+
+    <resultMap id="GameResultMap" type="com.kbo.stats.domain.Game">
+        <id     property="id"        column="id"/>
+        <result property="gameDate"  column="game_date"/>
+        <result property="gameTime"  column="game_time"/>
+        <result property="awayTeam"  column="away_team"/>
+        <result property="homeTeam"  column="home_team"/>
+        <result property="awayScore" column="away_score"/>
+        <result property="homeScore" column="home_score"/>
+        <result property="status"    column="status"
+                typeHandler="org.apache.ibatis.type.EnumTypeHandler"/>
+        <result property="stadium"   column="stadium"/>
+        <result property="notes"     column="notes"/>
+        <result property="createdAt" column="created_at"/>
+        <result property="updatedAt" column="updated_at"/>
+    </resultMap>
+
+    <sql id="selectColumns">
+        id, game_date, game_time, away_team, home_team,
+        away_score, home_score, status, stadium, notes,
+        created_at, updated_at
+    </sql>
+
+    <!-- 기간별 경기 조회 -->
+    <select id="findByDateRange" resultMap="GameResultMap">
+        SELECT <include refid="selectColumns"/>
+        FROM game
+        WHERE game_date BETWEEN #{start} AND #{end}
+        ORDER BY game_date, game_time
+    </select>
+
+    <!-- 날짜별 경기 조회 -->
+    <select id="findByDate" resultMap="GameResultMap">
+        SELECT <include refid="selectColumns"/>
+        FROM game
+        WHERE game_date = #{date}
+        ORDER BY game_time
+    </select>
+
+    <!-- 팀 + 기간별 경기 조회 (홈/원정 모두 포함) -->
+    <select id="findByTeamAndDateRange" resultMap="GameResultMap">
+        SELECT <include refid="selectColumns"/>
+        FROM game
+        WHERE game_date BETWEEN #{start} AND #{end}
+          AND (away_team = #{team} OR home_team = #{team})
+        ORDER BY game_date, game_time
+    </select>
+
+    <!-- 단건 조회 -->
+    <select id="findById" resultMap="GameResultMap">
+        SELECT <include refid="selectColumns"/>
+        FROM game
+        WHERE id = #{id}
+    </select>
+
+    <!-- 상태별 카운트 -->
+    <select id="countByStatus" resultType="int">
+        SELECT COUNT(*) FROM game WHERE status = #{status}
+    </select>
+
+    <!-- 경기 등록/업데이트 (날짜+팀 UNIQUE KEY 중복 시 점수·상태 갱신) -->
+    <insert id="upsert" parameterType="com.kbo.stats.domain.Game">
+        INSERT INTO game (game_date, game_time, away_team, home_team,
+                          away_score, home_score, status, stadium, notes)
+        VALUES (#{gameDate}, #{gameTime}, #{awayTeam}, #{homeTeam},
+                #{awayScore}, #{homeScore},
+                #{status, typeHandler=org.apache.ibatis.type.EnumTypeHandler},
+                #{stadium}, #{notes})
+        ON DUPLICATE KEY UPDATE
+            game_time  = VALUES(game_time),
+            away_score = VALUES(away_score),
+            home_score = VALUES(home_score),
+            status     = VALUES(status),
+            stadium    = VALUES(stadium),
+            notes      = VALUES(notes),
+            updated_at = CURRENT_TIMESTAMP
+    </insert>
+
+</mapper>
