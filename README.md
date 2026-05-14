@@ -2,6 +2,10 @@
 
 KBO 리그의 선수 기록, 경기 일정/결과, AI 챗봇 기능을 제공하는 웹 애플리케이션입니다.
 
+🌐 **데모 사이트**: [http://43.200.221.146:8080](http://43.200.221.146:8080)
+
+> AWS EC2 (Ubuntu) + RDS MySQL로 배포
+
 ## 📌 프로젝트 소개
 
 KBO 공식 사이트에서 선수 기록과 경기 일정을 자동으로 수집해 보여주고, 회원가입한 사용자는 응원팀을 설정해 개인화된 일정 화면을 받을 수 있습니다. Claude Haiku API 기반 챗봇으로 선수 기록을 자연어로 질문할 수 있고, 동일 질문 캐싱과 IP별 요청 제한으로 호출 비용을 관리합니다.
@@ -10,19 +14,19 @@ KBO 공식 사이트에서 선수 기록과 경기 일정을 자동으로 수집
 
 ## 🛠 기술 스택
 
-| 구분       | 기술                                              |
-| ---------- | ------------------------------------------------- |
-| Backend    | Java 17, Spring Boot 3.x, Spring Security         |
-| DB         | MySQL 8.0, MyBatis                                |
-| Crawling   | Selenium 4 (ChromeDriver), Jsoup                  |
-| AI         | Anthropic Claude API (Haiku)                      |
-| Cache      | Caffeine                                          |
-| Rate Limit | Bucket4j                                          |
-| Frontend   | Thymeleaf, Bootstrap 5                            |
-| API Docs   | SpringDoc OpenAPI (Swagger UI)                    |
-| Build      | Maven                                             |
-| Dev Tool   | Claude Code (AI Pair Programming)                 |
-| etc        | Lombok, BCrypt                                    |
+| 구분       | 기술                                      |
+| ---------- | ----------------------------------------- |
+| Backend    | Java 17, Spring Boot 3.x, Spring Security |
+| DB         | MySQL 8.0, MyBatis                        |
+| Crawling   | Selenium 4 (ChromeDriver), Jsoup          |
+| AI         | Anthropic Claude API (Haiku)              |
+| Cache      | Caffeine                                  |
+| Rate Limit | Bucket4j                                  |
+| Frontend   | Thymeleaf, Bootstrap 5                    |
+| API Docs   | SpringDoc OpenAPI (Swagger UI)            |
+| Build      | Maven                                     |
+| Dev Tool   | Claude Code (AI Pair Programming)         |
+| etc        | Lombok, BCrypt                            |
 
 ## 📁 프로젝트 구조
 
@@ -303,18 +307,18 @@ API 문서는 `http://localhost:8080/swagger-ui.html`에서 확인할 수 있습
 
 ## 📡 REST API
 
-| Method | URL                            | 설명               | 권한   |
-| ------ | ------------------------------ | ------------------ | ------ |
-| GET    | /api/v1/players                | 선수 목록 조회     | 모두   |
-| GET    | /api/v1/players/{id}           | 선수 상세 조회     | 모두   |
-| POST   | /api/v1/players                | 선수 등록          | ADMIN  |
-| PUT    | /api/v1/players/{id}           | 선수 수정          | ADMIN  |
-| DELETE | /api/v1/players/{id}           | 선수 삭제          | ADMIN  |
-| GET    | /api/v1/games?from=&to=        | 경기 일정 조회     | 모두   |
-| GET    | /api/v1/games/{id}             | 경기 상세 조회     | 모두   |
-| POST   | /games/crawl                   | 경기 데이터 갱신   | ADMIN  |
-| POST   | /players/crawl                 | 선수 데이터 갱신   | ADMIN  |
-| POST   | /api/v1/chatbot                | 챗봇 질의          | 모두   |
-| POST   | /signup                        | 회원가입           | 익명   |
-| GET    | /my/profile                    | 마이페이지         | USER   |
-| POST   | /my/team                       | 응원팀 변경        | USER   |
+| Method | URL                     | 설명             | 권한  |
+| ------ | ----------------------- | ---------------- | ----- |
+| GET    | /api/v1/players         | 선수 목록 조회   | 모두  |
+| GET    | /api/v1/players/{id}    | 선수 상세 조회   | 모두  |
+| POST   | /api/v1/players         | 선수 등록        | ADMIN |
+| PUT    | /api/v1/players/{id}    | 선수 수정        | ADMIN |
+| DELETE | /api/v1/players/{id}    | 선수 삭제        | ADMIN |
+| GET    | /api/v1/games?from=&to= | 경기 일정 조회   | 모두  |
+| GET    | /api/v1/games/{id}      | 경기 상세 조회   | 모두  |
+| POST   | /games/crawl            | 경기 데이터 갱신 | ADMIN |
+| POST   | /players/crawl          | 선수 데이터 갱신 | ADMIN |
+| POST   | /api/v1/chatbot         | 챗봇 질의        | 모두  |
+| POST   | /signup                 | 회원가입         | 익명  |
+| GET    | /my/profile             | 마이페이지       | USER  |
+| POST   | /my/team                | 응원팀 변경      | USER  |
