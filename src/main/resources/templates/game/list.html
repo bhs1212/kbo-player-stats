@@ -99,7 +99,7 @@
             <input type="hidden" name="month" th:value="${selectedMonth}">
             <label class="form-label mb-0 small text-muted fw-semibold">팀 필터:</label>
             <select name="team" class="form-select form-select-sm" style="width:auto;">
-                <option value="">전체 팀</option>
+                <option value="ALL">전체 팀</option>
                 <option th:each="t : ${teams}"
                         th:value="${t}"
                         th:text="${t}"
