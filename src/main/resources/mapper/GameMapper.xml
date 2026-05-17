@@ -13,6 +13,7 @@
         <result property="awayScore" column="away_score"/>
         <result property="homeScore" column="home_score"/>
         <result property="status"    column="status"
+                javaType="com.kbo.stats.domain.GameStatus"
                 typeHandler="org.apache.ibatis.type.EnumTypeHandler"/>
         <result property="stadium"   column="stadium"/>
         <result property="notes"     column="notes"/>
@@ -61,6 +62,54 @@
     <!-- 상태별 카운트 -->
     <select id="countByStatus" resultType="int">
         SELECT COUNT(*) FROM game WHERE status = #{status}
+    </select>
+
+    <!-- 팀 순위 집계 (FINISHED 경기 기준) -->
+    <select id="findTeamStandings" resultType="com.kbo.stats.dto.TeamStandingDto">
+        SELECT team,
+               SUM(wins)   AS wins,
+               SUM(losses) AS losses,
+               SUM(draws)  AS draws,
+               SUM(wins) + SUM(losses) + SUM(draws) AS totalGames,
+               ROUND(SUM(wins) / NULLIF(SUM(wins) + SUM(losses), 0), 3) AS winRate
+        FROM (
+            SELECT home_team AS team,
+                   SUM(CASE WHEN home_score > away_score THEN 1 ELSE 0 END) AS wins,
+                   SUM(CASE WHEN home_score &lt; away_score THEN 1 ELSE 0 END) AS losses,
+                   SUM(CASE WHEN home_score = away_score THEN 1 ELSE 0 END) AS draws
+            FROM game WHERE status = 'FINISHED'
+            GROUP BY home_team
+            UNION ALL
+            SELECT away_team AS team,
+                   SUM(CASE WHEN away_score > home_score THEN 1 ELSE 0 END) AS wins,
+                   SUM(CASE WHEN away_score &lt; home_score THEN 1 ELSE 0 END) AS losses,
+                   SUM(CASE WHEN away_score = home_score THEN 1 ELSE 0 END) AS draws
+            FROM game WHERE status = 'FINISHED'
+            GROUP BY away_team
+        ) t
+        GROUP BY team
+        ORDER BY winRate DESC, wins DESC
+    </select>
+
+    <!-- 팀 최근 N경기 (완료된 경기, 최신순) -->
+    <select id="findRecentByTeam" resultMap="GameResultMap">
+        SELECT <include refid="selectColumns"/>
+        FROM game
+        WHERE (away_team = #{team} OR home_team = #{team})
+          AND status = 'FINISHED'
+        ORDER BY game_date DESC, game_time DESC
+        LIMIT #{limit}
+    </select>
+
+    <!-- 팀 다음 예정 경기 -->
+    <select id="findNextByTeam" resultMap="GameResultMap">
+        SELECT <include refid="selectColumns"/>
+        FROM game
+        WHERE (away_team = #{team} OR home_team = #{team})
+          AND game_date >= #{afterDate}
+          AND status IN ('SCHEDULED', 'POSTPONED')
+        ORDER BY game_date ASC, game_time ASC
+        LIMIT 1
     </select>
 
     <!-- 경기 등록/업데이트 (날짜+팀 UNIQUE KEY 중복 시 점수·상태 갱신) -->

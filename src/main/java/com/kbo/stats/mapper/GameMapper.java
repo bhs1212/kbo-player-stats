@@ -2,6 +2,7 @@ package com.kbo.stats.mapper;
 
 import com.kbo.stats.domain.Game;
 import com.kbo.stats.domain.GameStatus;
+import com.kbo.stats.dto.TeamStandingDto;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 
@@ -31,4 +32,13 @@ public interface GameMapper {
 
     /** 상태별 카운트 */
     int countByStatus(@Param("status") GameStatus status);
+
+    /** 팀 순위 집계 (FINISHED 경기 기준 승/패/무 집계) */
+    List<TeamStandingDto> findTeamStandings();
+
+    /** 특정 팀의 최근 N경기 (완료된 경기, 최신순) */
+    List<Game> findRecentByTeam(@Param("team") String team, @Param("limit") int limit);
+
+    /** 특정 팀의 다음 예정 경기 */
+    Optional<Game> findNextByTeam(@Param("team") String team, @Param("afterDate") LocalDate afterDate);
 }

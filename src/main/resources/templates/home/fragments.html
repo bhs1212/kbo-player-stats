@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+
+  <!-- 시즌 랭킹 목록 (statField: battingAvg / homeRuns / era / wins) -->
+  <th:block th:fragment="rankingList(players, statField)">
+    <div th:if="${players != null and !#lists.isEmpty(players)}">
+      <div th:each="p, iter : ${players}" class="game-row">
+        <span class="text-muted" style="width:20px; font-size:0.85rem"
+              th:text="${iter.index + 1}"></span>
+        <span class="flex-grow-1 fw-semibold ms-2" th:text="${p.name}"></span>
+        <span class="text-muted small me-2" th:text="${p.team}"></span>
+        <span class="fw-bold text-primary">
+          <span th:if="${statField == 'battingAvg'}"
+                th:text="${p.battingAvg != null ? #numbers.formatDecimal(p.battingAvg, 1, 3) : '-'}"></span>
+          <span th:if="${statField == 'homeRuns'}"
+                th:text="${p.homeRuns != null ? p.homeRuns : '-'}"></span>
+          <span th:if="${statField == 'era'}"
+                th:text="${p.era != null ? #numbers.formatDecimal(p.era, 1, 2) : '-'}"></span>
+          <span th:if="${statField == 'wins'}"
+                th:text="${p.wins != null ? p.wins : '-'}"></span>
+        </span>
+      </div>
+    </div>
+    <div th:if="${players == null or #lists.isEmpty(players)}" class="empty-state">
+      데이터 없음
+    </div>
+  </th:block>
+
+</body>
+</html>

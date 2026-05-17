@@ -53,6 +53,14 @@ public class GameService {
                 ));
     }
 
+    public List<Game> getRecentByTeam(String team, int limit) {
+        return gameMapper.findRecentByTeam(team, limit);
+    }
+
+    public java.util.Optional<Game> getNextByTeam(String team, LocalDate afterDate) {
+        return gameMapper.findNextByTeam(team, afterDate);
+    }
+
     @Transactional
     public void upsert(Game game) {
         gameMapper.upsert(game);

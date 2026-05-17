@@ -1,0 +1,576 @@
+<!doctype html>
+<html
+  lang="ko"
+  xmlns:th="http://www.thymeleaf.org"
+  xmlns:sec="http://www.thymeleaf.org/extras/spring-security"
+  th:replace="~{layout/base :: base(
+    '대시보드',
+    ~{::main-content},
+    ~{::extra-head},
+    ~{::extra-script}
+  )}"
+>
+  <th:block th:fragment="extra-head">
+    <style>
+      .dashboard-card {
+        border: 0;
+        box-shadow: 0 0.125rem 0.5rem rgba(0, 0, 0, 0.08);
+        height: 100%;
+      }
+      .dashboard-card .card-header {
+        background: #fff;
+        border-bottom: 2px solid #0d6efd;
+        font-weight: 600;
+        padding: 0.75rem 1rem;
+      }
+      .dashboard-card .card-header.team-header {
+        border-bottom-color: #ffc107;
+      }
+      .game-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 0.4rem 0;
+        border-bottom: 1px solid #f1f3f5;
+        font-size: 0.9rem;
+      }
+      .game-row:last-child { border-bottom: 0; }
+      .game-teams { flex: 1; text-align: center; }
+      .game-time  { font-size: 0.8rem; color: #6c757d; min-width: 55px; text-align: left; }
+      .game-winner { color: #0d6efd; }
+      .standings-table th, .standings-table td {
+        padding: 0.35rem 0.5rem;
+        font-size: 0.85rem;
+      }
+      .rank-badge {
+        display: inline-block;
+        width: 22px;
+        height: 22px;
+        line-height: 22px;
+        text-align: center;
+        border-radius: 50%;
+        font-size: 0.75rem;
+        font-weight: 700;
+      }
+      .rank-1 { background: #ffc107; color: #fff; }
+      .rank-2 { background: #adb5bd; color: #fff; }
+      .rank-3 { background: #cd7f32; color: #fff; }
+      .rank-other { background: #e9ecef; color: #495057; }
+      .leader-card {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        padding: 0.6rem 0;
+        border-bottom: 1px solid #f1f3f5;
+      }
+      .leader-card:last-child { border-bottom: 0; }
+      .leader-icon {
+        width: 36px;
+        height: 36px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.1rem;
+        flex-shrink: 0;
+      }
+      .recent-dot {
+        display: inline-block;
+        width: 18px;
+        height: 18px;
+        border-radius: 50%;
+        line-height: 18px;
+        text-align: center;
+        font-size: 0.65rem;
+        font-weight: 700;
+        color: #fff;
+      }
+      .dot-win  { background: #0d6efd; }
+      .dot-loss { background: #dc3545; }
+      .dot-draw { background: #6c757d; }
+      .empty-state {
+        text-align: center;
+        color: #adb5bd;
+        padding: 1.5rem 0;
+        font-size: 0.9rem;
+      }
+      .nav-tabs .nav-link { font-size: 0.85rem; }
+    </style>
+  </th:block>
+
+  <main th:fragment="main-content">
+
+    <!-- 페이지 헤더 -->
+    <div class="d-flex justify-content-between align-items-center mb-3">
+      <h4 class="fw-bold mb-0">
+        <i class="bi bi-speedometer2 text-primary me-1"></i> KBO 대시보드
+      </h4>
+      <span class="text-muted small"
+            th:text="${#temporals.format(today, 'yyyy년 MM월 dd일')}"></span>
+    </div>
+
+    <!-- ===== 로그인 사용자: 응원팀 맞춤 대시보드 ===== -->
+    <div th:if="${favoriteTeam != null}">
+      <div class="row g-3 mb-3">
+
+        <!-- 좌상단: 응원팀 정보 -->
+        <div class="col-md-6">
+          <div class="card dashboard-card">
+            <div class="card-header team-header d-flex justify-content-between align-items-center">
+              <span>
+                <i class="bi bi-star-fill text-warning me-1"></i>
+                내 응원팀 &mdash; <span th:text="${favoriteTeam}"></span>
+              </span>
+              <a th:href="@{/my/team}" class="text-decoration-none text-muted small">
+                <i class="bi bi-arrow-right-circle"></i>
+              </a>
+            </div>
+            <div class="card-body p-3">
+
+              <!-- 팀 순위 요약 -->
+              <div th:if="${teamStanding != null}"
+                   class="d-flex justify-content-around text-center mb-3">
+                <div>
+                  <div class="fw-bold fs-5 text-primary" th:text="${teamStanding.rank}"></div>
+                  <div class="text-muted small">순위</div>
+                </div>
+                <div>
+                  <div class="fw-bold fs-5 text-success" th:text="${teamStanding.wins}"></div>
+                  <div class="text-muted small">승</div>
+                </div>
+                <div>
+                  <div class="fw-bold fs-5 text-danger" th:text="${teamStanding.losses}"></div>
+                  <div class="text-muted small">패</div>
+                </div>
+                <div>
+                  <div class="fw-bold fs-5 text-secondary" th:text="${teamStanding.draws}"></div>
+                  <div class="text-muted small">무</div>
+                </div>
+                <div>
+                  <div class="fw-bold fs-5"
+                       th:text="${#numbers.formatDecimal(teamStanding.winRate, 1, 3)}"></div>
+                  <div class="text-muted small">승률</div>
+                </div>
+              </div>
+              <div th:if="${teamStanding == null}"
+                   class="text-muted small mb-3">순위 데이터 없음</div>
+
+              <!-- 최근 5경기 결과 (W/L/D 도트) -->
+              <div class="mb-1 small fw-semibold text-muted">최근 5경기</div>
+              <div th:if="${recentTeamGames != null and !#lists.isEmpty(recentTeamGames)}"
+                   class="d-flex gap-1 flex-wrap">
+                <th:block th:each="g : ${recentTeamGames}">
+                  <!-- 원정팀인 경우 -->
+                  <th:block th:if="${g.awayTeam == favoriteTeam}">
+                    <span th:if="${g.awayScore != null and g.homeScore != null}"
+                          th:class="${g.awayScore > g.homeScore} ? 'recent-dot dot-win' : (${g.awayScore < g.homeScore} ? 'recent-dot dot-loss' : 'recent-dot dot-draw')"
+                          th:text="${g.awayScore > g.homeScore} ? 'W' : (${g.awayScore < g.homeScore} ? 'L' : 'D')"
+                          th:title="${g.awayTeam + ' ' + g.awayScore + ':' + g.homeScore + ' ' + g.homeTeam}"></span>
+                  </th:block>
+                  <!-- 홈팀인 경우 -->
+                  <th:block th:if="${g.homeTeam == favoriteTeam}">
+                    <span th:if="${g.homeScore != null and g.awayScore != null}"
+                          th:class="${g.homeScore > g.awayScore} ? 'recent-dot dot-win' : (${g.homeScore < g.awayScore} ? 'recent-dot dot-loss' : 'recent-dot dot-draw')"
+                          th:text="${g.homeScore > g.awayScore} ? 'W' : (${g.homeScore < g.awayScore} ? 'L' : 'D')"
+                          th:title="${g.awayTeam + ' ' + g.awayScore + ':' + g.homeScore + ' ' + g.homeTeam}"></span>
+                  </th:block>
+                </th:block>
+              </div>
+              <div th:if="${recentTeamGames == null or #lists.isEmpty(recentTeamGames)}"
+                   class="text-muted small">최근 경기 없음</div>
+            </div>
+            <div class="card-footer bg-white border-0 pt-0">
+              <a th:href="@{/games(team=${favoriteTeam})}" class="btn btn-sm btn-outline-warning w-100">
+                <i class="bi bi-calendar3 me-1"></i> 전체 일정 보기
+              </a>
+            </div>
+          </div>
+        </div>
+
+        <!-- 우상단: 응원팀 경기 (어제 결과 + 다음 경기) -->
+        <div class="col-md-6">
+          <div class="card dashboard-card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+              <span><i class="bi bi-calendar-event me-1 text-primary"></i> 응원팀 경기 일정</span>
+            </div>
+            <div class="card-body p-3">
+
+              <!-- 어제 경기 결과 (컨트롤러에서 미리 필터링된 teamYesterdayGames 사용) -->
+              <div class="mb-3">
+                <div class="small fw-semibold text-muted mb-1">어제 경기 결과</div>
+                <th:block th:if="${teamYesterdayGames != null and !#lists.isEmpty(teamYesterdayGames)}">
+                  <div th:each="g : ${teamYesterdayGames}" class="game-row">
+                    <span class="game-time small text-muted"
+                          th:text="${g.stadium != null ? g.stadium : '-'}"></span>
+                    <span class="game-teams fw-semibold">
+                      <span th:text="${g.awayTeam}"
+                            th:classappend="${g.awayWin} ? ' game-winner' : ''"></span>
+                      <span class="mx-1 fw-bold" th:text="${g.resultText}"></span>
+                      <span th:text="${g.homeTeam}"
+                            th:classappend="${g.homeWin} ? ' game-winner' : ''"></span>
+                    </span>
+                    <span class="badge bg-secondary">종료</span>
+                  </div>
+                </th:block>
+                <div th:if="${teamYesterdayGames == null or #lists.isEmpty(teamYesterdayGames)}"
+                     class="empty-state" style="padding: 0.5rem 0;">어제 경기가 없습니다</div>
+              </div>
+
+              <!-- 다음 예정 경기 -->
+              <div>
+                <div class="small fw-semibold text-muted mb-1">다음 예정 경기</div>
+                <div th:if="${nextTeamGame != null}" class="game-row">
+                  <span class="game-time"
+                        th:text="${#temporals.format(nextTeamGame.gameDate, 'MM/dd')}"></span>
+                  <span class="game-teams fw-semibold">
+                    <span th:text="${nextTeamGame.awayTeam}"></span>
+                    <span class="text-muted mx-1">vs</span>
+                    <span th:text="${nextTeamGame.homeTeam}"></span>
+                  </span>
+                  <span class="badge bg-primary"
+                        th:text="${nextTeamGame.stadium != null ? nextTeamGame.stadium : '예정'}"></span>
+                </div>
+                <div th:if="${nextTeamGame == null}"
+                     class="empty-state" style="padding: 0.5rem 0;">예정된 경기가 없습니다</div>
+              </div>
+            </div>
+            <div class="card-footer bg-white border-0 pt-0">
+              <a th:href="@{/games}" class="btn btn-sm btn-outline-primary w-100">
+                <i class="bi bi-list-ul me-1"></i> 전체 경기 일정
+              </a>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <div class="row g-3 mb-4">
+
+        <!-- 좌하단: 응원팀 주요 선수 -->
+        <div class="col-md-6">
+          <div class="card dashboard-card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+              <span><i class="bi bi-person-badge me-1 text-primary"></i> 응원팀 주요 선수</span>
+              <a th:href="@{/my/team}" class="text-decoration-none text-muted small">더보기</a>
+            </div>
+            <div class="card-body p-3">
+              <div th:if="${teamLeaders != null}">
+
+                <!-- 타율 1위 -->
+                <div th:if="${teamLeaders.battingLeader != null}" class="leader-card">
+                  <div class="leader-icon bg-primary bg-opacity-10 text-primary">
+                    <i class="bi bi-bat"></i>
+                  </div>
+                  <div class="flex-grow-1">
+                    <div class="fw-semibold" th:text="${teamLeaders.battingLeader.name}"></div>
+                    <div class="text-muted small" th:text="${teamLeaders.battingLeader.position}"></div>
+                  </div>
+                  <div class="text-end">
+                    <div class="fw-bold text-primary"
+                         th:text="${teamLeaders.battingLeader.battingAvg != null
+                                   ? #numbers.formatDecimal(teamLeaders.battingLeader.battingAvg, 1, 3)
+                                   : '-'}"></div>
+                    <div class="text-muted" style="font-size:0.75rem">타율</div>
+                  </div>
+                </div>
+                <div th:if="${teamLeaders.battingLeader == null}" class="leader-card">
+                  <span class="text-muted small">타율 데이터 없음 (10경기 이상 필요)</span>
+                </div>
+
+                <!-- 홈런 1위 -->
+                <div th:if="${teamLeaders.homeRunLeader != null}" class="leader-card">
+                  <div class="leader-icon bg-warning bg-opacity-10 text-warning">
+                    <i class="bi bi-trophy"></i>
+                  </div>
+                  <div class="flex-grow-1">
+                    <div class="fw-semibold" th:text="${teamLeaders.homeRunLeader.name}"></div>
+                    <div class="text-muted small" th:text="${teamLeaders.homeRunLeader.position}"></div>
+                  </div>
+                  <div class="text-end">
+                    <div class="fw-bold text-warning"
+                         th:text="${teamLeaders.homeRunLeader.homeRuns != null
+                                   ? teamLeaders.homeRunLeader.homeRuns : '-'}"></div>
+                    <div class="text-muted" style="font-size:0.75rem">홈런</div>
+                  </div>
+                </div>
+                <div th:if="${teamLeaders.homeRunLeader == null}" class="leader-card">
+                  <span class="text-muted small">홈런 데이터 없음</span>
+                </div>
+
+                <!-- 방어율 1위 -->
+                <div th:if="${teamLeaders.eraLeader != null}" class="leader-card">
+                  <div class="leader-icon bg-danger bg-opacity-10 text-danger">
+                    <i class="bi bi-wind"></i>
+                  </div>
+                  <div class="flex-grow-1">
+                    <div class="fw-semibold" th:text="${teamLeaders.eraLeader.name}"></div>
+                    <div class="text-muted small" th:text="${teamLeaders.eraLeader.position}"></div>
+                  </div>
+                  <div class="text-end">
+                    <div class="fw-bold text-danger"
+                         th:text="${teamLeaders.eraLeader.era != null
+                                   ? #numbers.formatDecimal(teamLeaders.eraLeader.era, 1, 2)
+                                   : '-'}"></div>
+                    <div class="text-muted" style="font-size:0.75rem">방어율</div>
+                  </div>
+                </div>
+                <div th:if="${teamLeaders.eraLeader == null}" class="leader-card">
+                  <span class="text-muted small">방어율 데이터 없음 (5경기 이상 필요)</span>
+                </div>
+
+              </div>
+              <div th:if="${teamLeaders == null}" class="empty-state">데이터를 불러올 수 없습니다</div>
+            </div>
+            <div class="card-footer bg-white border-0 pt-0">
+              <a th:href="@{/players(team=${favoriteTeam})}" class="btn btn-sm btn-outline-primary w-100">
+                <i class="bi bi-people-fill me-1"></i> 팀 선수 전체 보기
+              </a>
+            </div>
+          </div>
+        </div>
+
+        <!-- 우하단: 시즌 전체 랭킹 TOP 5 -->
+        <div class="col-md-6">
+          <div class="card dashboard-card">
+            <div class="card-header">
+              <i class="bi bi-trophy-fill me-1 text-warning"></i> 시즌 랭킹 TOP 5
+            </div>
+            <div class="card-body p-3">
+              <ul class="nav nav-tabs mb-2" role="tablist">
+                <li class="nav-item">
+                  <button class="nav-link active" data-bs-toggle="tab"
+                          data-bs-target="#tab-batting-login">타율</button>
+                </li>
+                <li class="nav-item">
+                  <button class="nav-link" data-bs-toggle="tab"
+                          data-bs-target="#tab-hr-login">홈런</button>
+                </li>
+                <li class="nav-item">
+                  <button class="nav-link" data-bs-toggle="tab"
+                          data-bs-target="#tab-era-login">방어율</button>
+                </li>
+                <li class="nav-item">
+                  <button class="nav-link" data-bs-toggle="tab"
+                          data-bs-target="#tab-wins-login">승리</button>
+                </li>
+              </ul>
+              <div class="tab-content">
+                <div class="tab-pane fade show active" id="tab-batting-login">
+                  <th:block th:replace="~{home/fragments :: rankingList(${battingTop5}, 'battingAvg')}"></th:block>
+                </div>
+                <div class="tab-pane fade" id="tab-hr-login">
+                  <th:block th:replace="~{home/fragments :: rankingList(${homeRunTop5}, 'homeRuns')}"></th:block>
+                </div>
+                <div class="tab-pane fade" id="tab-era-login">
+                  <th:block th:replace="~{home/fragments :: rankingList(${eraTop5}, 'era')}"></th:block>
+                </div>
+                <div class="tab-pane fade" id="tab-wins-login">
+                  <th:block th:replace="~{home/fragments :: rankingList(${winsTop5}, 'wins')}"></th:block>
+                </div>
+              </div>
+            </div>
+            <div class="card-footer bg-white border-0 pt-0">
+              <a th:href="@{/ranking}" class="btn btn-sm btn-outline-warning w-100">
+                <i class="bi bi-trophy me-1"></i> 전체 랭킹 보기
+              </a>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+    <!-- ===== /로그인 사용자 ===== -->
+
+
+    <!-- ===== 비로그인 사용자 ===== -->
+    <div th:if="${favoriteTeam == null}">
+      <div class="row g-3 mb-3">
+
+        <!-- 좌상단: 오늘의 경기 -->
+        <div class="col-md-6">
+          <div class="card dashboard-card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+              <span><i class="bi bi-calendar-check me-1 text-primary"></i> 오늘의 경기</span>
+              <span class="badge bg-primary" th:text="${#lists.size(todayGames)} + '경기'"></span>
+            </div>
+            <div class="card-body p-3" style="max-height:230px; overflow-y:auto;">
+              <div th:each="g : ${todayGames}" class="game-row">
+                <span class="game-time"
+                      th:text="${g.gameTime != null ? #temporals.format(g.gameTime, 'HH:mm') : '-'}"></span>
+                <span class="game-teams">
+                  <span th:text="${g.awayTeam}"></span>
+                  <span class="text-muted mx-1">vs</span>
+                  <span th:text="${g.homeTeam}"></span>
+                </span>
+                <span th:text="${g.stadium != null ? g.stadium : ''}"
+                      class="text-muted small"></span>
+              </div>
+              <div th:if="${#lists.isEmpty(todayGames)}" class="empty-state">
+                <i class="bi bi-calendar-x d-block mb-1" style="font-size:1.5rem"></i>
+                오늘 예정된 경기가 없습니다
+              </div>
+            </div>
+            <div class="card-footer bg-white border-0 pt-0">
+              <a th:href="@{/games}" class="btn btn-sm btn-outline-primary w-100">
+                <i class="bi bi-calendar3 me-1"></i> 전체 일정 보기
+              </a>
+            </div>
+          </div>
+        </div>
+
+        <!-- 우상단: 어제 경기 결과 (FINISHED만) -->
+        <div class="col-md-6">
+          <div class="card dashboard-card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+              <span><i class="bi bi-clipboard-check me-1 text-success"></i> 어제 경기 결과</span>
+              <span class="badge bg-success" th:text="${#lists.size(yesterdayGames)} + '경기'"></span>
+            </div>
+            <div class="card-body p-3" style="max-height:230px; overflow-y:auto;">
+              <div th:each="g : ${yesterdayGames}" class="game-row">
+                <span class="game-time small text-muted"
+                      th:text="${g.stadium != null ? g.stadium : '-'}"></span>
+                <span class="game-teams">
+                  <span th:text="${g.awayTeam}"
+                        th:classappend="${g.awayWin} ? ' fw-bold game-winner' : ''"></span>
+                  <span class="mx-1 fw-bold" th:text="${g.resultText}"></span>
+                  <span th:text="${g.homeTeam}"
+                        th:classappend="${g.homeWin} ? ' fw-bold game-winner' : ''"></span>
+                </span>
+                <span class="badge bg-secondary">종료</span>
+              </div>
+              <div th:if="${#lists.isEmpty(yesterdayGames)}" class="empty-state">
+                <i class="bi bi-calendar-x d-block mb-1" style="font-size:1.5rem"></i>
+                어제 경기 결과가 없습니다
+              </div>
+            </div>
+            <div class="card-footer bg-white border-0 pt-0">
+              <a th:href="@{/games}" class="btn btn-sm btn-outline-success w-100">
+                <i class="bi bi-list-check me-1"></i> 경기 결과 더보기
+              </a>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <div class="row g-3 mb-4">
+
+        <!-- 좌하단: 시즌 랭킹 TOP 5 -->
+        <div class="col-md-6">
+          <div class="card dashboard-card">
+            <div class="card-header">
+              <i class="bi bi-trophy-fill me-1 text-warning"></i> 시즌 랭킹 TOP 5
+            </div>
+            <div class="card-body p-3">
+              <ul class="nav nav-tabs mb-2" role="tablist">
+                <li class="nav-item">
+                  <button class="nav-link active" data-bs-toggle="tab"
+                          data-bs-target="#tab-batting">타율</button>
+                </li>
+                <li class="nav-item">
+                  <button class="nav-link" data-bs-toggle="tab"
+                          data-bs-target="#tab-hr">홈런</button>
+                </li>
+                <li class="nav-item">
+                  <button class="nav-link" data-bs-toggle="tab"
+                          data-bs-target="#tab-era">방어율</button>
+                </li>
+                <li class="nav-item">
+                  <button class="nav-link" data-bs-toggle="tab"
+                          data-bs-target="#tab-wins">승리</button>
+                </li>
+              </ul>
+              <div class="tab-content">
+                <div class="tab-pane fade show active" id="tab-batting">
+                  <th:block th:replace="~{home/fragments :: rankingList(${battingTop5}, 'battingAvg')}"></th:block>
+                </div>
+                <div class="tab-pane fade" id="tab-hr">
+                  <th:block th:replace="~{home/fragments :: rankingList(${homeRunTop5}, 'homeRuns')}"></th:block>
+                </div>
+                <div class="tab-pane fade" id="tab-era">
+                  <th:block th:replace="~{home/fragments :: rankingList(${eraTop5}, 'era')}"></th:block>
+                </div>
+                <div class="tab-pane fade" id="tab-wins">
+                  <th:block th:replace="~{home/fragments :: rankingList(${winsTop5}, 'wins')}"></th:block>
+                </div>
+              </div>
+            </div>
+            <div class="card-footer bg-white border-0 pt-0">
+              <a th:href="@{/ranking}" class="btn btn-sm btn-outline-warning w-100">
+                <i class="bi bi-trophy me-1"></i> 전체 랭킹 보기
+              </a>
+            </div>
+          </div>
+        </div>
+
+        <!-- 우하단: 팀 순위 -->
+        <div class="col-md-6">
+          <div class="card dashboard-card">
+            <div class="card-header">
+              <i class="bi bi-bar-chart-steps me-1 text-primary"></i> 팀 순위
+            </div>
+            <div class="card-body p-2">
+              <div th:if="${!#lists.isEmpty(teamStandings)}">
+                <table class="table table-sm standings-table mb-0">
+                  <thead>
+                    <tr>
+                      <th>순위</th>
+                      <th>팀</th>
+                      <th class="text-center">승</th>
+                      <th class="text-center">패</th>
+                      <th class="text-center">무</th>
+                      <th class="text-center">승률</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr th:each="s : ${teamStandings}" th:if="${s.rank <= 10}">
+                      <td>
+                        <span th:class="${s.rank == 1} ? 'rank-badge rank-1'
+                                       : (${s.rank == 2} ? 'rank-badge rank-2'
+                                       : (${s.rank == 3} ? 'rank-badge rank-3'
+                                       : 'rank-badge rank-other'))"
+                              th:text="${s.rank}"></span>
+                      </td>
+                      <td class="fw-semibold" th:text="${s.team}"></td>
+                      <td class="text-center text-success fw-bold" th:text="${s.wins}"></td>
+                      <td class="text-center text-danger" th:text="${s.losses}"></td>
+                      <td class="text-center text-secondary" th:text="${s.draws}"></td>
+                      <td class="text-center fw-semibold"
+                          th:text="${#numbers.formatDecimal(s.winRate, 1, 3)}"></td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+              <div th:if="${#lists.isEmpty(teamStandings)}" class="empty-state">
+                <i class="bi bi-database-x d-block mb-1" style="font-size:1.5rem"></i>
+                경기 데이터가 없습니다
+              </div>
+            </div>
+            <div class="card-footer bg-white border-0 pt-0">
+              <a th:href="@{/games}" class="btn btn-sm btn-outline-primary w-100">
+                <i class="bi bi-calendar3 me-1"></i> 경기 일정 보기
+              </a>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- 로그인 유도 배너 -->
+      <div class="alert alert-info d-flex align-items-center gap-3" role="alert">
+        <i class="bi bi-star-fill text-warning fs-4"></i>
+        <div>
+          <strong>응원팀을 등록하고 맞춤 대시보드를 이용하세요!</strong>
+          <span class="ms-2">
+            <a th:href="@{/login}" class="alert-link">로그인</a> 또는
+            <a th:href="@{/signup}" class="alert-link">회원가입</a>
+          </span>
+        </div>
+      </div>
+    </div>
+    <!-- ===== /비로그인 사용자 ===== -->
+
+  </main>
+
+  <th:block th:fragment="extra-script"></th:block>
+</html>

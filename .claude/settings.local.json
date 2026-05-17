@@ -45,7 +45,13 @@
       "PowerShell(Get-Content C:\\\\Develops\\\\kbo-player-stats\\\\app-run.log | Select-String \"15:59\" | Where-Object { $_ -match \"경기 크롤러\" } | ForEach-Object { $_.Line })",
       "PowerShell(Get-Content C:\\\\Develops\\\\kbo-player-stats\\\\app-run.log | Select-String \"Starting KboPlayer|Started KboPlayer\" | Select-Object -Last 5 | ForEach-Object { $_.Line })",
       "PowerShell(Get-Content C:\\\\Develops\\\\kbo-player-stats\\\\app-run.log | Select-String \"16:05\" | Where-Object { $_ -match \"경기 크롤러\" } | ForEach-Object { $_.Line })",
-      "PowerShell(Get-ChildItem C:\\\\Develops\\\\kbo-player-stats -Name | Where-Object { $_ -match \"mvn|maven|pom\" })"
+      "PowerShell(Get-ChildItem C:\\\\Develops\\\\kbo-player-stats -Name | Where-Object { $_ -match \"mvn|maven|pom\" })",
+      "PowerShell(mvn spring-boot:run *)",
+      "PowerShell(Start-Sleep -Seconds 3; Invoke-WebRequest -Uri \"http://localhost:8080/\" -MaximumRedirection 0 -ErrorAction SilentlyContinue | Select-Object StatusCode, Headers)",
+      "PowerShell($r = Invoke-WebRequest -Uri \"http://localhost:8080/api/v1/dashboard/standings\" -TimeoutSec 10; $r.Content | ConvertFrom-Json | Select-Object success, message -ExpandProperty data | Select-Object -First 5 | Format-Table)",
+      "PowerShell(Get-Content \"C:\\\\Develops\\\\kbo-player-stats\\\\app.log\" -Tail 80 | Where-Object { $_ -match \"ERROR|Exception|Caused|NullPointer|TemplateProcessing\" })",
+      "PowerShell(Get-Content \"C:\\\\Develops\\\\kbo-player-stats\\\\app-run.log\" -Tail 50 | Where-Object { $_ -match \"ERROR|Exception|Caused|dashboard|Dashboard\" })",
+      "PowerShell(mysql *)"
     ]
   }
 }

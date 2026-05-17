@@ -73,4 +73,13 @@ public interface PlayerMapper {
 
     // 팀 목록 (중복 제거)
     List<String> findAllTeams();
+
+    // 팀별 타율 1위 선수 (타자, 10경기 이상)
+    Optional<Player> findBattingLeaderByTeam(@Param("team") String team);
+
+    // 팀별 홈런 1위 선수 (타자)
+    Optional<Player> findHomeRunLeaderByTeam(@Param("team") String team);
+
+    // 팀별 방어율 1위 선수 (투수, ERA 최저)
+    Optional<Player> findEraLeaderByTeam(@Param("team") String team);
 }

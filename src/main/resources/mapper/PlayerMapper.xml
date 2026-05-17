@@ -250,4 +250,39 @@
         ORDER BY team
     </select>
 
+    <!-- 팀별 타율 1위 선수 (10경기 이상) -->
+    <select id="findBattingLeaderByTeam" resultMap="PlayerResultMap">
+        SELECT <include refid="selectColumns"/>
+        FROM player
+        WHERE team = #{team}
+          AND player_type = 'BATTER'
+          AND batting_avg IS NOT NULL
+          AND games >= 10
+        ORDER BY batting_avg DESC
+        LIMIT 1
+    </select>
+
+    <!-- 팀별 홈런 1위 선수 -->
+    <select id="findHomeRunLeaderByTeam" resultMap="PlayerResultMap">
+        SELECT <include refid="selectColumns"/>
+        FROM player
+        WHERE team = #{team}
+          AND player_type = 'BATTER'
+          AND home_runs IS NOT NULL
+        ORDER BY home_runs DESC
+        LIMIT 1
+    </select>
+
+    <!-- 팀별 방어율 1위 선수 (ERA 최저, 5경기 이상) -->
+    <select id="findEraLeaderByTeam" resultMap="PlayerResultMap">
+        SELECT <include refid="selectColumns"/>
+        FROM player
+        WHERE team = #{team}
+          AND player_type = 'PITCHER'
+          AND era IS NOT NULL
+          AND games >= 5
+        ORDER BY era ASC
+        LIMIT 1
+    </select>
+
 </mapper>

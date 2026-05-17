@@ -16,11 +16,12 @@ mybatis:
   type-aliases-package: com.kbo.stats.domain
   configuration:
     map-underscore-to-camel-case: true
-    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+    log-impl: org.apache.ibatis.logging.slf4j.Slf4jImpl
 
 logging:
   level:
     com.kbo.stats: DEBUG
+    com.kbo.stats.mapper: TRACE
     org.mybatis: DEBUG
   charset:
     console: UTF-8

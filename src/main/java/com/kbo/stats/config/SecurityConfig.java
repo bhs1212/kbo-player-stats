@@ -37,12 +37,15 @@ public class SecurityConfig {
                     "/login",
                     "/signup",
                     "/error",
+                    "/favicon.ico",
                     "/css/**", "/js/**", "/images/**", "/webjars/**",
                     "/swagger-ui/**", "/swagger-ui.html",
                     "/v3/api-docs/**", "/api-docs/**"
                 ).permitAll()
                 // 챗봇 POST - Rate Limit으로 보호 중이므로 공개 허용
                 .requestMatchers(new AntPathRequestMatcher("/api/chat", "POST")).permitAll()
+                // 대시보드 API - 전체 공개
+                .requestMatchers("/api/v1/dashboard/**").permitAll()
 
                 // ── 회원 전용 경로 ──
                 .requestMatchers("/my/**").hasAnyRole("USER", "ADMIN")
@@ -80,7 +83,7 @@ public class SecurityConfig {
             // 폼 로그인
             .formLogin(form -> form
                 .loginPage("/login")
-                .defaultSuccessUrl("/players", true)
+                .defaultSuccessUrl("/", true)
                 .failureUrl("/login?error=true")
                 .permitAll()
             )
