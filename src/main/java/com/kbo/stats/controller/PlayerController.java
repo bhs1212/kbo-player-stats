@@ -1,12 +1,17 @@
 package com.kbo.stats.controller;
 
+import com.kbo.stats.domain.BatterStats;
+import com.kbo.stats.domain.PitcherStats;
 import com.kbo.stats.domain.Player;
 import com.kbo.stats.domain.PlayerType;
 import com.kbo.stats.dto.PageDto;
 import com.kbo.stats.dto.PlayerFormDto;
 import com.kbo.stats.dto.PlayerSearchDto;
+import com.kbo.stats.mapper.BatterStatsMapper;
+import com.kbo.stats.mapper.PitcherStatsMapper;
 import com.kbo.stats.service.CsvImportService;
 import com.kbo.stats.service.PlayerService;
+import com.kbo.stats.service.SabermetricsService;
 import io.swagger.v3.oas.annotations.Hidden;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -18,6 +23,7 @@ import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 import java.io.IOException;
+import java.math.BigDecimal;
 import java.util.List;
 
 @Hidden
@@ -28,6 +34,9 @@ public class PlayerController {
 
     private final PlayerService playerService;
     private final CsvImportService csvImportService;
+    private final BatterStatsMapper batterStatsMapper;
+    private final PitcherStatsMapper pitcherStatsMapper;
+    private final SabermetricsService sabermetricsService;
 
     /** 선수 목록 */
     @GetMapping
@@ -50,6 +59,57 @@ public class PlayerController {
     public String detail(@PathVariable Long id, Model model) {
         Player player = playerService.findById(id);
         model.addAttribute("player", player);
+
+        if (player.getPlayerType() == PlayerType.BATTER) {
+            BatterStats stats = batterStatsMapper.findByPlayerId(id);
+            model.addAttribute("batterStats", stats);
+
+            if (stats != null) {
+                Integer hits = player.getHits();
+                Integer hr   = player.getHomeRuns();
+                BigDecimal avg = player.getBattingAvg() != null
+                        ? BigDecimal.valueOf(player.getBattingAvg()) : null;
+
+                model.addAttribute("ops",   sabermetricsService.calculateOPS(stats, hits));
+                model.addAttribute("obp",   sabermetricsService.calculateOBP(stats, hits));
+                model.addAttribute("slg",   sabermetricsService.calculateSLG(stats));
+                model.addAttribute("iso",   sabermetricsService.calculateISO(stats, avg));
+                model.addAttribute("bbPerK", sabermetricsService.calculateBBperK(stats));
+                model.addAttribute("babip",  sabermetricsService.calculateBABIP(stats, hits, hr));
+                model.addAttribute("woba",   sabermetricsService.calculateWOBA(stats, hits, hr));
+
+                model.addAttribute("leagueOps",    sabermetricsService.getLeagueAverageOPS());
+                model.addAttribute("leagueObp",    sabermetricsService.getLeagueAverageOBP());
+                model.addAttribute("leagueSlg",    sabermetricsService.getLeagueAverageSLG());
+                model.addAttribute("leagueIso",    sabermetricsService.getLeagueAverageISO());
+                model.addAttribute("leagueBbPerK", sabermetricsService.getLeagueAverageBBperK());
+                model.addAttribute("leagueBabip",  sabermetricsService.getLeagueAverageBABIP());
+                model.addAttribute("leagueWoba",   sabermetricsService.getLeagueAverageWOBA());
+            }
+
+        } else if (player.getPlayerType() == PlayerType.PITCHER) {
+            PitcherStats stats = pitcherStatsMapper.findByPlayerId(id);
+            model.addAttribute("pitcherStats", stats);
+
+            if (stats != null) {
+                BigDecimal fipConst = sabermetricsService.getLeagueFIPConstant();
+
+                model.addAttribute("whip",   sabermetricsService.calculateWHIP(stats));
+                model.addAttribute("kPer9",  sabermetricsService.calculateKper9(stats));
+                model.addAttribute("bbPer9", sabermetricsService.calculateBBper9(stats));
+                model.addAttribute("kPerBb", sabermetricsService.calculateKperBB(stats));
+                model.addAttribute("hrPer9", sabermetricsService.calculateHRper9(stats));
+                model.addAttribute("fip",    sabermetricsService.calculateFIP(stats, fipConst));
+
+                model.addAttribute("leagueWhip",   sabermetricsService.getLeagueAverageWHIP());
+                model.addAttribute("leagueEra",    sabermetricsService.getLeagueAverageERA());
+                model.addAttribute("leagueKper9",  sabermetricsService.getLeagueAverageKper9());
+                model.addAttribute("leagueBbPer9", sabermetricsService.getLeagueAverageBBper9());
+                model.addAttribute("leagueKperBb", sabermetricsService.getLeagueAverageKperBB());
+                model.addAttribute("leagueHrPer9", sabermetricsService.getLeagueAverageHRper9());
+            }
+        }
+
         return "player/detail";
     }
 

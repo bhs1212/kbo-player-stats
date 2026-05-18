@@ -37,6 +37,10 @@ public class Player {
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 
+    // 세이버메트릭스 상세 기록 (JOIN 시에만 채워짐, 기본 null)
+    private BatterStats batterStats;
+    private PitcherStats pitcherStats;
+
     public boolean isBatter() {
         return PlayerType.BATTER == this.playerType;
     }

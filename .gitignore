@@ -6,3 +6,5 @@ target/
 *.iml
 .DS_Store
 src/main/resources/application-local.yml
+# Claude Code local settings
+.claude/settings.local.json

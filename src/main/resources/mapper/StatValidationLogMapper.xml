@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.kbo.stats.mapper.StatValidationLogMapper">
+
+    <resultMap id="ValidationLogResultMap" type="com.kbo.stats.domain.StatValidationLog">
+        <id     property="id"              column="id"/>
+        <result property="playerId"        column="player_id"/>
+        <result property="metricName"      column="metric_name"/>
+        <result property="siteValue"       column="site_value"/>
+        <result property="calculatedValue" column="calculated_value"/>
+        <result property="diff"            column="diff"/>
+        <result property="isMatch"         column="is_match"/>
+        <result property="crawledAt"       column="crawled_at"/>
+    </resultMap>
+
+    <insert id="insert" parameterType="com.kbo.stats.domain.StatValidationLog">
+        INSERT INTO stat_validation_log
+            (player_id, metric_name, site_value, calculated_value, diff, is_match)
+        VALUES
+            (#{playerId}, #{metricName}, #{siteValue}, #{calculatedValue}, #{diff}, #{isMatch})
+    </insert>
+
+    <select id="findRecent" resultMap="ValidationLogResultMap">
+        SELECT *
+        FROM stat_validation_log
+        ORDER BY crawled_at DESC
+        LIMIT #{limit}
+    </select>
+
+    <select id="countTotal" resultType="Long">
+        SELECT COUNT(*) FROM stat_validation_log
+    </select>
+
+    <select id="countMatched" resultType="Long">
+        SELECT COUNT(*) FROM stat_validation_log WHERE is_match = TRUE
+    </select>
+
+    <select id="countByMetric" resultType="Long">
+        SELECT COUNT(*) FROM stat_validation_log WHERE metric_name = #{metric}
+    </select>
+
+    <select id="countMatchedByMetric" resultType="Long">
+        SELECT COUNT(*) FROM stat_validation_log
+        WHERE metric_name = #{metric} AND is_match = TRUE
+    </select>
+
+</mapper>

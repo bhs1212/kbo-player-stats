@@ -1,0 +1,110 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.kbo.stats.mapper.PitcherStatsMapper">
+
+    <resultMap id="PitcherStatsResultMap" type="com.kbo.stats.domain.PitcherStats">
+        <id     property="playerId"         column="player_id"/>
+        <result property="losses"           column="losses"/>
+        <result property="winPct"           column="win_pct"/>
+        <result property="inningsOuts"      column="innings_outs"/>
+        <result property="hitsAllowed"      column="hits_allowed"/>
+        <result property="homeRunsAllowed"  column="home_runs_allowed"/>
+        <result property="walksAllowed"     column="walks_allowed"/>
+        <result property="hbpAllowed"       column="hbp_allowed"/>
+        <result property="strikeouts"       column="strikeouts"/>
+        <result property="runsAllowed"      column="runs_allowed"/>
+        <result property="earnedRuns"       column="earned_runs"/>
+        <result property="whip"             column="whip"/>
+        <result property="completeGames"    column="complete_games"/>
+        <result property="shutouts"         column="shutouts"/>
+        <result property="qualityStarts"    column="quality_starts"/>
+        <result property="blownSaves"       column="blown_saves"/>
+        <result property="battersFaced"     column="batters_faced"/>
+        <result property="pitchesThrown"    column="pitches_thrown"/>
+        <result property="opponentAvg"      column="opponent_avg"/>
+        <result property="wildPitches"      column="wild_pitches"/>
+        <result property="balks"            column="balks"/>
+        <result property="createdAt"        column="created_at"/>
+        <result property="updatedAt"        column="updated_at"/>
+    </resultMap>
+
+    <sql id="selectColumns">
+        player_id, losses, win_pct, innings_outs, hits_allowed, home_runs_allowed,
+        walks_allowed, hbp_allowed, strikeouts, runs_allowed, earned_runs, whip,
+        complete_games, shutouts, quality_starts, blown_saves, batters_faced,
+        pitches_thrown, opponent_avg, wild_pitches, balks,
+        created_at, updated_at
+    </sql>
+
+    <!-- 단건 조회 -->
+    <select id="findByPlayerId" resultMap="PitcherStatsResultMap">
+        SELECT <include refid="selectColumns"/>
+        FROM player_pitcher_stats
+        WHERE player_id = #{playerId}
+    </select>
+
+    <!-- 전체 조회 (리그 평균 계산용) -->
+    <select id="findAll" resultMap="PitcherStatsResultMap">
+        SELECT <include refid="selectColumns"/>
+        FROM player_pitcher_stats
+        ORDER BY player_id
+    </select>
+
+    <!-- INSERT ... ON DUPLICATE KEY UPDATE -->
+    <insert id="upsert" parameterType="com.kbo.stats.domain.PitcherStats">
+        INSERT INTO player_pitcher_stats (
+            player_id, losses, win_pct, innings_outs, hits_allowed, home_runs_allowed,
+            walks_allowed, hbp_allowed, strikeouts, runs_allowed, earned_runs, whip,
+            complete_games, shutouts, quality_starts, blown_saves, batters_faced,
+            pitches_thrown, opponent_avg, wild_pitches, balks
+        ) VALUES (
+            #{playerId}, #{losses}, #{winPct}, #{inningsOuts}, #{hitsAllowed}, #{homeRunsAllowed},
+            #{walksAllowed}, #{hbpAllowed}, #{strikeouts}, #{runsAllowed}, #{earnedRuns}, #{whip},
+            #{completeGames}, #{shutouts}, #{qualityStarts}, #{blownSaves}, #{battersFaced},
+            #{pitchesThrown}, #{opponentAvg}, #{wildPitches}, #{balks}
+        )
+        ON DUPLICATE KEY UPDATE
+            losses              = VALUES(losses),
+            win_pct             = VALUES(win_pct),
+            innings_outs        = VALUES(innings_outs),
+            hits_allowed        = VALUES(hits_allowed),
+            home_runs_allowed   = VALUES(home_runs_allowed),
+            walks_allowed       = VALUES(walks_allowed),
+            hbp_allowed         = VALUES(hbp_allowed),
+            strikeouts          = VALUES(strikeouts),
+            runs_allowed        = VALUES(runs_allowed),
+            earned_runs         = VALUES(earned_runs),
+            whip                = VALUES(whip),
+            complete_games      = VALUES(complete_games),
+            shutouts            = VALUES(shutouts),
+            quality_starts      = VALUES(quality_starts),
+            blown_saves         = VALUES(blown_saves),
+            batters_faced       = VALUES(batters_faced),
+            pitches_thrown      = VALUES(pitches_thrown),
+            opponent_avg        = VALUES(opponent_avg),
+            wild_pitches        = VALUES(wild_pitches),
+            balks               = VALUES(balks),
+            updated_at          = NOW()
+    </insert>
+
+    <!-- 전체 삭제 (크롤링 재실행용) -->
+    <delete id="deleteAll">
+        DELETE FROM player_pitcher_stats
+    </delete>
+
+    <!-- 리그 집계 합계 (K/9·BB/9·HR/9·K/BB 가중 평균용) -->
+    <select id="findLeagueTotals" resultType="com.kbo.stats.dto.LeagueTotalsDto">
+        SELECT
+            COALESCE(SUM(innings_outs),      0) AS totalOuts,
+            COALESCE(SUM(strikeouts),        0) AS totalStrikeouts,
+            COALESCE(SUM(walks_allowed),     0) AS totalWalks,
+            COALESCE(SUM(home_runs_allowed), 0) AS totalHomeRuns,
+            COALESCE(SUM(hits_allowed),      0) AS totalHitsAllowed,
+            COALESCE(SUM(earned_runs),       0) AS totalEarnedRuns
+        FROM player_pitcher_stats
+        WHERE innings_outs IS NOT NULL
+    </select>
+
+</mapper>

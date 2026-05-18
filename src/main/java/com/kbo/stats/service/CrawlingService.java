@@ -1,7 +1,12 @@
 package com.kbo.stats.service;
 
+import com.kbo.stats.domain.BatterStats;
+import com.kbo.stats.domain.PitcherStats;
 import com.kbo.stats.domain.Player;
 import com.kbo.stats.domain.PlayerType;
+import com.kbo.stats.mapper.BatterStatsMapper;
+import com.kbo.stats.mapper.PitcherStatsMapper;
+import com.kbo.stats.mapper.PlayerMapper;
 import io.github.bonigarcia.wdm.WebDriverManager;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -21,11 +26,14 @@ import org.openqa.selenium.support.ui.WebDriverWait;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StopWatch;
 
+import java.math.BigDecimal;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 @Slf4j
 @Service
@@ -49,11 +57,21 @@ public class CrawlingService {
             "https://www.koreabaseball.com/Record/Player/PitcherBasic/Basic1.aspx";
     private static final String KBO_PITCHER_SAVE_URL =
             "https://www.koreabaseball.com/Record/Player/PitcherBasic/Basic1.aspx?sort=SV_CN";
+    private static final String KBO_BATTER_DETAIL_URL =
+            "https://www.koreabaseball.com/Record/Player/HitterBasic/Basic2.aspx";
+    private static final String KBO_PITCHER_DETAIL_URL =
+            "https://www.koreabaseball.com/Record/Player/PitcherBasic/Basic2.aspx";
+    private static final String KBO_PITCHER_DETAIL_SAVE_URL =
+            "https://www.koreabaseball.com/Record/Player/PitcherBasic/Basic2.aspx?sort=SV_CN";
 
     private static final String TABLE_ROW_SEL = "table.tData01 tbody tr";
     private static final String PAGER_LINK_SEL = "div.paging a";
 
     private final PlayerService playerService;
+    private final PlayerMapper playerMapper;
+    private final BatterStatsMapper batterStatsMapper;
+    private final PitcherStatsMapper pitcherStatsMapper;
+    private final SabermetricsService sabermetricsService;
 
     public void crawlAll() {
         log.info("=== KBO 크롤링 시작 (시즌: {}) ===", CURRENT_SEASON);
@@ -80,6 +98,38 @@ public class CrawlingService {
 
             sw.start("세이브/홀드 크롤링");
             crawlSavesAndHolds(driver);
+            sw.stop();
+
+            // 세이버메트릭스 통계 크롤링 시작 전 초기화
+            batterStatsMapper.deleteAll();
+            pitcherStatsMapper.deleteAll();
+
+            sw.start("타자 Basic1 추가 컬럼");
+            crawlBatterBasic1Extra(driver);
+            sw.stop();
+
+            sw.start("타자 Basic2");
+            crawlBatterDetail(driver);
+            sw.stop();
+
+            sw.start("투수 Basic1 추가 컬럼 (ERA 정렬)");
+            crawlPitcherBasic1Extra(driver, KBO_PITCHER_URL);
+            sw.stop();
+
+            sw.start("투수 Basic1 추가 컬럼 (SV 정렬)");
+            crawlPitcherBasic1Extra(driver, KBO_PITCHER_SAVE_URL);
+            sw.stop();
+
+            sw.start("투수 Basic2 (ERA 정렬)");
+            crawlPitcherDetail(driver, KBO_PITCHER_DETAIL_URL);
+            sw.stop();
+
+            sw.start("투수 Basic2 (SV 정렬)");
+            crawlPitcherDetail(driver, KBO_PITCHER_DETAIL_SAVE_URL);
+            sw.stop();
+
+            sw.start("세이버메트릭스 검증");
+            runValidation();
             sw.stop();
         } finally {
             if (driver != null) {
@@ -413,6 +463,287 @@ public class CrawlingService {
         log.info("[세이브/홀드] 크롤링 완료 ({}명 upsert)", count);
     }
 
+    // ── 세이버메트릭스 검증 ───────────────────────────────────────────
+
+    private void runValidation() {
+        int matched = 0, total = 0;
+
+        for (Player batter : playerMapper.findAllByPlayerType(PlayerType.BATTER)) {
+            BatterStats stats = batterStatsMapper.findByPlayerId(batter.getId());
+            if (stats == null) continue;
+            sabermetricsService.validateOPS(batter.getId(), stats, batter.getHits());
+            sabermetricsService.validateOBP(batter.getId(), stats, batter.getHits());
+            sabermetricsService.validateSLG(batter.getId(), stats);
+            total += 3;
+        }
+
+        for (Player pitcher : playerMapper.findAllByPlayerType(PlayerType.PITCHER)) {
+            PitcherStats stats = pitcherStatsMapper.findByPlayerId(pitcher.getId());
+            if (stats == null) continue;
+            sabermetricsService.validateWHIP(pitcher.getId(), stats);
+            total++;
+        }
+
+        log.info("[검증] 완료 - 총 {}건 기록", total);
+    }
+
+    // ── 세이버메트릭스 크롤링 ─────────────────────────────────────────
+
+    // 타자 Basic1에서 신규 컬럼(PA/AB/R/2B/3B/TB/SAC/SF) 추출
+    // 컬럼: 순위(0) 선수명(1) 팀명(2) AVG(3) G(4) PA(5) AB(6) R(7) H(8) 2B(9) 3B(10) HR(11) TB(12) RBI(13) SAC(14) SF(15)
+    private void crawlBatterBasic1Extra(WebDriver driver) {
+        final String LABEL = "타자Basic1확장";
+        log.info("[{}] 크롤링 시작 → {}", LABEL, KBO_BATTER_URL);
+        int count = 0;
+        try {
+            driver.get(KBO_BATTER_URL);
+            WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(TABLE_WAIT_SECONDS));
+            wait.until(ExpectedConditions.presenceOfElementLocated(By.cssSelector(TABLE_ROW_SEL)));
+            Thread.sleep(PAGE_DELAY_MS);
+            selectSeason(driver, wait, LABEL);
+
+            for (int page = 1; ; page++) {
+                Document doc = Jsoup.parse(driver.getPageSource());
+                Elements rows = filterDataRows(doc.select(TABLE_ROW_SEL));
+                for (Element row : rows) {
+                    try {
+                        Elements cols = row.select("td");
+                        if (cols.size() < 16) continue;
+                        String name = extractName(cols.get(1));
+                        String team = cols.get(2).text().trim();
+                        Long playerId = playerMapper.findIdByNameAndTeam(name, team);
+                        if (playerId == null) {
+                            log.warn("[{}] player_id 없음: {}({}) → skip", LABEL, name, team);
+                            continue;
+                        }
+                        BatterStats stats = BatterStats.builder()
+                                .playerId(playerId)
+                                .plateAppearances(parseInt(cols.get(5).text()))
+                                .atBats(parseInt(cols.get(6).text()))
+                                .runs(parseInt(cols.get(7).text()))
+                                .doubles(parseInt(cols.get(9).text()))
+                                .triples(parseInt(cols.get(10).text()))
+                                .totalBases(parseInt(cols.get(12).text()))
+                                .sacrificeHits(parseInt(cols.get(14).text()))
+                                .sacrificeFlies(parseInt(cols.get(15).text()))
+                                .build();
+                        batterStatsMapper.upsert(stats);
+                        count++;
+                    } catch (Exception e) {
+                        log.warn("[{}] 행 파싱 실패: {}", LABEL, e.getMessage());
+                    }
+                }
+                log.info("[{}] 페이지 {} 처리 (누적: {}명)", LABEL, page, count);
+                if (!goToNextPage(driver, wait)) break;
+            }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            log.warn("[{}] 인터럽트 → 중단 (처리: {}명)", LABEL, count);
+        } catch (Exception e) {
+            log.error("[{}] 크롤링 실패: {} (처리: {}명)", LABEL, e.getMessage(), count, e);
+        }
+        log.info("[{}] 크롤링 완료 ({}명 처리)", LABEL, count);
+    }
+
+    // 타자 Basic2에서 신규 컬럼(BB/IBB/HBP/SO/GDP/SLG/OBP/OPS) 추출 + Basic1확장 데이터 보존
+    // 컬럼: 순위(0) 선수명(1) 팀명(2) AVG(3) BB(4) IBB(5) HBP(6) SO(7) GDP(8) SLG(9) OBP(10) OPS(11) MH(12) RISP(13) PH-BA(14)
+    private void crawlBatterDetail(WebDriver driver) {
+        final String LABEL = "타자Basic2";
+        log.info("[{}] 크롤링 시작 → {}", LABEL, KBO_BATTER_DETAIL_URL);
+        int count = 0;
+        try {
+            driver.get(KBO_BATTER_DETAIL_URL);
+            WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(TABLE_WAIT_SECONDS));
+            wait.until(ExpectedConditions.presenceOfElementLocated(By.cssSelector(TABLE_ROW_SEL)));
+            Thread.sleep(PAGE_DELAY_MS);
+            selectSeason(driver, wait, LABEL);
+
+            for (int page = 1; ; page++) {
+                Document doc = Jsoup.parse(driver.getPageSource());
+                Elements rows = filterDataRows(doc.select(TABLE_ROW_SEL));
+                for (Element row : rows) {
+                    try {
+                        Elements cols = row.select("td");
+                        if (cols.size() < 12) continue;
+                        String name = extractName(cols.get(1));
+                        String team = cols.get(2).text().trim();
+                        Long playerId = playerMapper.findIdByNameAndTeam(name, team);
+                        if (playerId == null) {
+                            log.warn("[{}] player_id 없음: {}({}) → skip", LABEL, name, team);
+                            continue;
+                        }
+                        // Basic1확장에서 저장된 필드 보존
+                        BatterStats existing = batterStatsMapper.findByPlayerId(playerId);
+                        BatterStats merged = BatterStats.builder()
+                                .playerId(playerId)
+                                .plateAppearances(existing != null ? existing.getPlateAppearances() : null)
+                                .atBats(existing != null ? existing.getAtBats() : null)
+                                .runs(existing != null ? existing.getRuns() : null)
+                                .doubles(existing != null ? existing.getDoubles() : null)
+                                .triples(existing != null ? existing.getTriples() : null)
+                                .totalBases(existing != null ? existing.getTotalBases() : null)
+                                .sacrificeHits(existing != null ? existing.getSacrificeHits() : null)
+                                .sacrificeFlies(existing != null ? existing.getSacrificeFlies() : null)
+                                // Basic2 신규 필드
+                                .walks(parseInt(cols.get(4).text()))
+                                .intentionalWalks(parseInt(cols.get(5).text()))
+                                .hitByPitch(parseInt(cols.get(6).text()))
+                                .strikeouts(parseInt(cols.get(7).text()))
+                                .doublePlays(parseInt(cols.get(8).text()))
+                                .sluggingPct(parseBigDecimal(cols.get(9).text()))
+                                .onBasePct(parseBigDecimal(cols.get(10).text()))
+                                .ops(parseBigDecimal(cols.get(11).text()))
+                                .build();
+                        batterStatsMapper.upsert(merged);
+                        count++;
+                    } catch (Exception e) {
+                        log.warn("[{}] 행 파싱 실패: {}", LABEL, e.getMessage());
+                    }
+                }
+                log.info("[{}] 페이지 {} 처리 (누적: {}명)", LABEL, page, count);
+                if (!goToNextPage(driver, wait)) break;
+            }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            log.warn("[{}] 인터럽트 → 중단 (처리: {}명)", LABEL, count);
+        } catch (Exception e) {
+            log.error("[{}] 크롤링 실패: {} (처리: {}명)", LABEL, e.getMessage(), count, e);
+        }
+        log.info("[{}] 크롤링 완료 ({}명 처리)", LABEL, count);
+    }
+
+    // 투수 Basic1에서 신규 컬럼(L/WPCT/IP/H/HR/BB/HBP/SO/R/ER/WHIP) 추출
+    // 컬럼: 순위(0) 선수명(1) 팀명(2) ERA(3) G(4) W(5) L(6) SV(7) HLD(8) WPCT(9) IP(10) H(11) HR(12) BB(13) HBP(14) SO(15) R(16) ER(17) WHIP(18)
+    private void crawlPitcherBasic1Extra(WebDriver driver, String url) {
+        final String LABEL = "투수Basic1확장(" + (url.contains("SV_CN") ? "SV" : "ERA") + ")";
+        log.info("[{}] 크롤링 시작 → {}", LABEL, url);
+        int count = 0;
+        try {
+            driver.get(url);
+            WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(TABLE_WAIT_SECONDS));
+            wait.until(ExpectedConditions.presenceOfElementLocated(By.cssSelector(TABLE_ROW_SEL)));
+            Thread.sleep(PAGE_DELAY_MS);
+            selectSeason(driver, wait, LABEL);
+            selectAllPitchers(driver, wait);
+
+            for (int page = 1; ; page++) {
+                Document doc = Jsoup.parse(driver.getPageSource());
+                Elements rows = filterDataRows(doc.select(TABLE_ROW_SEL));
+                for (Element row : rows) {
+                    try {
+                        Elements cols = row.select("td");
+                        if (cols.size() < 19) continue;
+                        String name = extractName(cols.get(1));
+                        String team = cols.get(2).text().trim();
+                        Long playerId = playerMapper.findIdByNameAndTeam(name, team);
+                        if (playerId == null) {
+                            log.warn("[{}] player_id 없음: {}({}) → skip", LABEL, name, team);
+                            continue;
+                        }
+                        PitcherStats stats = PitcherStats.builder()
+                                .playerId(playerId)
+                                .losses(parseInt(cols.get(6).text()))
+                                .winPct(parseBigDecimal(cols.get(9).text()))
+                                .inningsOuts(parseInningsToOuts(cols.get(10).text()))
+                                .hitsAllowed(parseInt(cols.get(11).text()))
+                                .homeRunsAllowed(parseInt(cols.get(12).text()))
+                                .walksAllowed(parseInt(cols.get(13).text()))
+                                .hbpAllowed(parseInt(cols.get(14).text()))
+                                .strikeouts(parseInt(cols.get(15).text()))
+                                .runsAllowed(parseInt(cols.get(16).text()))
+                                .earnedRuns(parseInt(cols.get(17).text()))
+                                .whip(parseBigDecimal(cols.get(18).text()))
+                                .build();
+                        pitcherStatsMapper.upsert(stats);
+                        count++;
+                    } catch (Exception e) {
+                        log.warn("[{}] 행 파싱 실패: {}", LABEL, e.getMessage());
+                    }
+                }
+                log.info("[{}] 페이지 {} 처리 (누적: {}명)", LABEL, page, count);
+                if (!goToNextPage(driver, wait)) break;
+            }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            log.warn("[{}] 인터럽트 → 중단 (처리: {}명)", LABEL, count);
+        } catch (Exception e) {
+            log.error("[{}] 크롤링 실패: {} (처리: {}명)", LABEL, e.getMessage(), count, e);
+        }
+        log.info("[{}] 크롤링 완료 ({}명 처리)", LABEL, count);
+    }
+
+    // 투수 Basic2에서 신규 컬럼(CG/SHO/QS/BSV/TBF/NP/피안타율/WP/BK) 추출 + Basic1확장 데이터 보존
+    // 컬럼: 순위(0) 선수명(1) 팀명(2) ERA(3) CG(4) SHO(5) QS(6) BSV(7) TBF(8) NP(9) AVG(10) 2B(11) 3B(12) SAC(13) SF(14) IBB(15) WP(16) BK(17)
+    private void crawlPitcherDetail(WebDriver driver, String url) {
+        final String LABEL = "투수Basic2(" + (url.contains("SV_CN") ? "SV" : "ERA") + ")";
+        log.info("[{}] 크롤링 시작 → {}", LABEL, url);
+        int count = 0;
+        try {
+            driver.get(url);
+            WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(TABLE_WAIT_SECONDS));
+            wait.until(ExpectedConditions.presenceOfElementLocated(By.cssSelector(TABLE_ROW_SEL)));
+            Thread.sleep(PAGE_DELAY_MS);
+            selectSeason(driver, wait, LABEL);
+            selectAllPitchers(driver, wait);
+
+            for (int page = 1; ; page++) {
+                Document doc = Jsoup.parse(driver.getPageSource());
+                Elements rows = filterDataRows(doc.select(TABLE_ROW_SEL));
+                for (Element row : rows) {
+                    try {
+                        Elements cols = row.select("td");
+                        if (cols.size() < 18) continue;
+                        String name = extractName(cols.get(1));
+                        String team = cols.get(2).text().trim();
+                        Long playerId = playerMapper.findIdByNameAndTeam(name, team);
+                        if (playerId == null) {
+                            log.warn("[{}] player_id 없음: {}({}) → skip", LABEL, name, team);
+                            continue;
+                        }
+                        // Basic1확장에서 저장된 필드 보존
+                        PitcherStats existing = pitcherStatsMapper.findByPlayerId(playerId);
+                        PitcherStats merged = PitcherStats.builder()
+                                .playerId(playerId)
+                                .losses(existing != null ? existing.getLosses() : null)
+                                .winPct(existing != null ? existing.getWinPct() : null)
+                                .inningsOuts(existing != null ? existing.getInningsOuts() : null)
+                                .hitsAllowed(existing != null ? existing.getHitsAllowed() : null)
+                                .homeRunsAllowed(existing != null ? existing.getHomeRunsAllowed() : null)
+                                .walksAllowed(existing != null ? existing.getWalksAllowed() : null)
+                                .hbpAllowed(existing != null ? existing.getHbpAllowed() : null)
+                                .strikeouts(existing != null ? existing.getStrikeouts() : null)
+                                .runsAllowed(existing != null ? existing.getRunsAllowed() : null)
+                                .earnedRuns(existing != null ? existing.getEarnedRuns() : null)
+                                .whip(existing != null ? existing.getWhip() : null)
+                                // Basic2 신규 필드
+                                .completeGames(parseInt(cols.get(4).text()))
+                                .shutouts(parseInt(cols.get(5).text()))
+                                .qualityStarts(parseInt(cols.get(6).text()))
+                                .blownSaves(parseInt(cols.get(7).text()))
+                                .battersFaced(parseInt(cols.get(8).text()))
+                                .pitchesThrown(parseInt(cols.get(9).text()))
+                                .opponentAvg(parseBigDecimal(cols.get(10).text()))
+                                .wildPitches(parseInt(cols.get(16).text()))
+                                .balks(parseInt(cols.get(17).text()))
+                                .build();
+                        pitcherStatsMapper.upsert(merged);
+                        count++;
+                    } catch (Exception e) {
+                        log.warn("[{}] 행 파싱 실패: {}", LABEL, e.getMessage());
+                    }
+                }
+                log.info("[{}] 페이지 {} 처리 (누적: {}명)", LABEL, page, count);
+                if (!goToNextPage(driver, wait)) break;
+            }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            log.warn("[{}] 인터럽트 → 중단 (처리: {}명)", LABEL, count);
+        } catch (Exception e) {
+            log.error("[{}] 크롤링 실패: {} (처리: {}명)", LABEL, e.getMessage(), count, e);
+        }
+        log.info("[{}] 크롤링 완료 ({}명 처리)", LABEL, count);
+    }
+
     // KBO ASP.NET 연도 드롭다운의 알려진 ClientID
     private static final String SEASON_DROPDOWN_ID =
             "cphContents_cphContents_cphContents_ddlSeason_ddlSeason";
@@ -589,5 +920,24 @@ public class CrawlingService {
         } catch (NumberFormatException e) {
             return null;
         }
+    }
+
+    private BigDecimal parseBigDecimal(String s) {
+        if (s == null || s.isBlank() || "-".equals(s.trim())) return null;
+        try {
+            return new BigDecimal(s.trim().replace(",", ""));
+        } catch (NumberFormatException e) {
+            return null;
+        }
+    }
+
+    // "52 1/3" → 157, "52 2/3" → 158, "52" → 156
+    private static Integer parseInningsToOuts(String text) {
+        if (text == null || text.isBlank()) return null;
+        Matcher m = Pattern.compile("(\\d+)(?:\\s+(\\d)/3)?").matcher(text.trim());
+        if (!m.matches()) return null;
+        int innings = Integer.parseInt(m.group(1));
+        int partial  = m.group(2) != null ? Integer.parseInt(m.group(2)) : 0;
+        return innings * 3 + partial;
     }
 }

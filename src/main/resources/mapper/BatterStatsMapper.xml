@@ -1,0 +1,106 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.kbo.stats.mapper.BatterStatsMapper">
+
+    <resultMap id="BatterStatsResultMap" type="com.kbo.stats.domain.BatterStats">
+        <id     property="playerId"         column="player_id"/>
+        <result property="plateAppearances" column="plate_appearances"/>
+        <result property="atBats"           column="at_bats"/>
+        <result property="runs"             column="runs"/>
+        <result property="doubles"          column="doubles"/>
+        <result property="triples"          column="triples"/>
+        <result property="totalBases"       column="total_bases"/>
+        <result property="walks"            column="walks"/>
+        <result property="intentionalWalks" column="intentional_walks"/>
+        <result property="hitByPitch"       column="hit_by_pitch"/>
+        <result property="strikeouts"       column="strikeouts"/>
+        <result property="doublePlays"      column="double_plays"/>
+        <result property="sacrificeHits"    column="sacrifice_hits"/>
+        <result property="sacrificeFlies"   column="sacrifice_flies"/>
+        <result property="sluggingPct"      column="slugging_pct"/>
+        <result property="onBasePct"        column="on_base_pct"/>
+        <result property="ops"              column="ops"/>
+        <result property="createdAt"        column="created_at"/>
+        <result property="updatedAt"        column="updated_at"/>
+    </resultMap>
+
+    <sql id="selectColumns">
+        player_id, plate_appearances, at_bats, runs, doubles, triples, total_bases,
+        walks, intentional_walks, hit_by_pitch, strikeouts, double_plays,
+        sacrifice_hits, sacrifice_flies, slugging_pct, on_base_pct, ops,
+        created_at, updated_at
+    </sql>
+
+    <!-- 단건 조회 -->
+    <select id="findByPlayerId" resultMap="BatterStatsResultMap">
+        SELECT <include refid="selectColumns"/>
+        FROM player_batter_stats
+        WHERE player_id = #{playerId}
+    </select>
+
+    <!-- 전체 조회 (리그 평균 계산용) -->
+    <select id="findAll" resultMap="BatterStatsResultMap">
+        SELECT <include refid="selectColumns"/>
+        FROM player_batter_stats
+        ORDER BY player_id
+    </select>
+
+    <!-- INSERT ... ON DUPLICATE KEY UPDATE -->
+    <insert id="upsert" parameterType="com.kbo.stats.domain.BatterStats">
+        INSERT INTO player_batter_stats (
+            player_id, plate_appearances, at_bats, runs, doubles, triples, total_bases,
+            walks, intentional_walks, hit_by_pitch, strikeouts, double_plays,
+            sacrifice_hits, sacrifice_flies, slugging_pct, on_base_pct, ops
+        ) VALUES (
+            #{playerId}, #{plateAppearances}, #{atBats}, #{runs}, #{doubles}, #{triples}, #{totalBases},
+            #{walks}, #{intentionalWalks}, #{hitByPitch}, #{strikeouts}, #{doublePlays},
+            #{sacrificeHits}, #{sacrificeFlies}, #{sluggingPct}, #{onBasePct}, #{ops}
+        )
+        ON DUPLICATE KEY UPDATE
+            plate_appearances  = VALUES(plate_appearances),
+            at_bats            = VALUES(at_bats),
+            runs               = VALUES(runs),
+            doubles            = VALUES(doubles),
+            triples            = VALUES(triples),
+            total_bases        = VALUES(total_bases),
+            walks              = VALUES(walks),
+            intentional_walks  = VALUES(intentional_walks),
+            hit_by_pitch       = VALUES(hit_by_pitch),
+            strikeouts         = VALUES(strikeouts),
+            double_plays       = VALUES(double_plays),
+            sacrifice_hits     = VALUES(sacrifice_hits),
+            sacrifice_flies    = VALUES(sacrifice_flies),
+            slugging_pct       = VALUES(slugging_pct),
+            on_base_pct        = VALUES(on_base_pct),
+            ops                = VALUES(ops),
+            updated_at         = NOW()
+    </insert>
+
+    <!-- 전체 삭제 (크롤링 재실행용) -->
+    <delete id="deleteAll">
+        DELETE FROM player_batter_stats
+    </delete>
+
+    <!-- 리그 집계 합계 (ISO·BABIP·wOBA·BB/K 가중 평균용, player JOIN으로 hits·home_runs 포함) -->
+    <select id="findLeagueTotals" resultType="com.kbo.stats.dto.BatterLeagueTotalsDto">
+        SELECT
+            COALESCE(SUM(pbs.at_bats),           0) AS totalAtBats,
+            COALESCE(SUM(p.hits),                0) AS totalHits,
+            COALESCE(SUM(p.home_runs),           0) AS totalHomeRuns,
+            COALESCE(SUM(pbs.doubles),           0) AS totalDoubles,
+            COALESCE(SUM(pbs.triples),           0) AS totalTriples,
+            COALESCE(SUM(pbs.total_bases),       0) AS totalTotalBases,
+            COALESCE(SUM(pbs.walks),             0) AS totalWalks,
+            COALESCE(SUM(pbs.intentional_walks), 0) AS totalIntentionalWalks,
+            COALESCE(SUM(pbs.hit_by_pitch),      0) AS totalHitByPitch,
+            COALESCE(SUM(pbs.strikeouts),        0) AS totalStrikeouts,
+            COALESCE(SUM(pbs.sacrifice_flies),   0) AS totalSacrificeFlies
+        FROM player_batter_stats pbs
+        JOIN player p ON pbs.player_id = p.id
+        WHERE pbs.at_bats IS NOT NULL
+          AND pbs.at_bats > 0
+    </select>
+
+</mapper>

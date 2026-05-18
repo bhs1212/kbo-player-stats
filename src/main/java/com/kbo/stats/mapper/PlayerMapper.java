@@ -1,6 +1,7 @@
 package com.kbo.stats.mapper;
 
 import com.kbo.stats.domain.Player;
+import com.kbo.stats.domain.PlayerType;
 import com.kbo.stats.dto.PlayerSearchDto;
 import com.kbo.stats.dto.TeamStatDto;
 import org.apache.ibatis.annotations.Mapper;
@@ -23,6 +24,9 @@ public interface PlayerMapper {
 
     // 이름+팀으로 존재 여부 확인 (크롤링 시 중복 체크)
     Optional<Player> findByNameAndTeam(@Param("name") String name, @Param("team") String team);
+
+    // 이름+팀으로 id만 조회 (세이버메트릭스 저장 시 player_id 조회용, 없으면 null)
+    Long findIdByNameAndTeam(@Param("name") String name, @Param("team") String team);
 
     // 등록
     void insert(Player player);
@@ -73,6 +77,9 @@ public interface PlayerMapper {
 
     // 팀 목록 (중복 제거)
     List<String> findAllTeams();
+
+    // 선수 유형 전체 조회 (세이버메트릭스 배치 검증용)
+    List<Player> findAllByPlayerType(@Param("playerType") PlayerType playerType);
 
     // 팀별 타율 1위 선수 (타자, 10경기 이상)
     Optional<Player> findBattingLeaderByTeam(@Param("team") String team);

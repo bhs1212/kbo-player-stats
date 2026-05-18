@@ -9,6 +9,7 @@
 <body>
 <th:block th:fragment="main-content">
 
+<!-- ── 브레드크럼 + 관리자 버튼 ──────────────────────────────────── -->
 <div class="d-flex justify-content-between align-items-center mb-3">
     <nav aria-label="breadcrumb">
         <ol class="breadcrumb mb-0">
@@ -16,7 +17,6 @@
             <li class="breadcrumb-item active" th:text="${player.name}"></li>
         </ol>
     </nav>
-    <!-- 관리자 전용 수정/삭제 버튼 -->
     <div class="d-flex gap-2" sec:authorize="hasRole('ADMIN')">
         <a th:href="@{/players/{id}/edit(id=${player.id})}" class="btn btn-warning btn-sm">
             <i class="bi bi-pencil"></i> 수정
@@ -30,8 +30,9 @@
     </div>
 </div>
 
+<!-- ── 프로필 + 주요 기록 (기존 4카드) ──────────────────────────── -->
 <div class="row">
-    <!-- 기본 정보 -->
+    <!-- 프로필 카드 -->
     <div class="col-md-4">
         <div class="card mb-3" th:classappend="${player.pitcher ? 'stat-card pitcher' : 'stat-card'}">
             <div class="card-body text-center py-4">
@@ -44,7 +45,7 @@
                 <span th:if="${player.pitcher}" class="badge badge-pitcher fs-6 mb-2">투수</span>
                 <div class="mt-2">
                     <span class="badge bg-secondary fs-6 me-1" th:text="${player.team}"></span>
-                    <span class="badge bg-light text-dark fs-6" th:text="${player.position}"></span>
+                    <span class="badge bg-light text-dark fs-6"  th:text="${player.position}"></span>
                 </div>
             </div>
         </div>
@@ -68,9 +69,9 @@
         </div>
     </div>
 
-    <!-- 기록 카드 -->
+    <!-- 주요 기록 카드 (기존) -->
     <div class="col-md-8">
-        <!-- 타자 기록 -->
+        <!-- 타자 주요 기록 -->
         <div th:if="${player.batter}">
             <h5 class="mb-3"><i class="bi bi-bar-chart-fill text-primary"></i> 타자 기록</h5>
             <div class="row g-3">
@@ -113,7 +114,7 @@
             </div>
         </div>
 
-        <!-- 투수 기록 -->
+        <!-- 투수 주요 기록 -->
         <div th:if="${player.pitcher}">
             <h5 class="mb-3"><i class="bi bi-bar-chart-fill text-danger"></i> 투수 기록</h5>
             <div class="row g-3">
@@ -139,8 +140,17 @@
                     <div class="card text-center h-100">
                         <div class="card-body">
                             <div class="fs-1 fw-bold"
-                                 th:text="${player.games != null ? player.games : '-'}"></div>
-                            <div class="text-muted small">경기수</div>
+                                 th:text="${player.saves != null ? player.saves : '-'}"></div>
+                            <div class="text-muted small">세이브 (SV)</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-6 col-md-4">
+                    <div class="card text-center h-100">
+                        <div class="card-body">
+                            <div class="fs-1 fw-bold text-secondary"
+                                 th:text="${player.holds != null ? player.holds : '-'}"></div>
+                            <div class="text-muted small">홀드 (HLD)</div>
                         </div>
                     </div>
                 </div>
@@ -149,6 +159,418 @@
     </div>
 </div>
 
+<!-- ── 섹션 1: 세부 기록 ──────────────────────────────────────────── -->
+<div class="mt-4">
+    <!-- 타자 세부 기록 -->
+    <div th:if="${player.batter}">
+        <h5 class="mb-3">
+            <i class="bi bi-table text-primary"></i> 세부 기록
+        </h5>
+        <div th:if="${batterStats != null}" class="row g-2">
+            <div class="col-6 col-md-3 col-lg-2">
+                <div class="card text-center py-2 h-100">
+                    <div class="fw-bold fs-4 text-primary"
+                         th:text="${batterStats.plateAppearances != null ? batterStats.plateAppearances : '-'}"></div>
+                    <div class="text-muted small">타석 (PA)</div>
+                </div>
+            </div>
+            <div class="col-6 col-md-3 col-lg-2">
+                <div class="card text-center py-2 h-100">
+                    <div class="fw-bold fs-4"
+                         th:text="${batterStats.atBats != null ? batterStats.atBats : '-'}"></div>
+                    <div class="text-muted small">타수 (AB)</div>
+                </div>
+            </div>
+            <div class="col-6 col-md-3 col-lg-2">
+                <div class="card text-center py-2 h-100">
+                    <div class="fw-bold fs-4 text-success"
+                         th:text="${batterStats.walks != null ? batterStats.walks : '-'}"></div>
+                    <div class="text-muted small">볼넷 (BB)</div>
+                </div>
+            </div>
+            <div class="col-6 col-md-3 col-lg-2">
+                <div class="card text-center py-2 h-100">
+                    <div class="fw-bold fs-4 text-danger"
+                         th:text="${batterStats.strikeouts != null ? batterStats.strikeouts : '-'}"></div>
+                    <div class="text-muted small">삼진 (SO)</div>
+                </div>
+            </div>
+            <div class="col-6 col-md-3 col-lg-2">
+                <div class="card text-center py-2 h-100">
+                    <div class="fw-bold fs-4"
+                         th:text="${batterStats.doubles != null ? batterStats.doubles : '-'}"></div>
+                    <div class="text-muted small">2루타 (2B)</div>
+                </div>
+            </div>
+            <div class="col-6 col-md-3 col-lg-2">
+                <div class="card text-center py-2 h-100">
+                    <div class="fw-bold fs-4"
+                         th:text="${batterStats.triples != null ? batterStats.triples : '-'}"></div>
+                    <div class="text-muted small">3루타 (3B)</div>
+                </div>
+            </div>
+            <div class="col-6 col-md-3 col-lg-2">
+                <div class="card text-center py-2 h-100">
+                    <div class="fw-bold fs-4 text-warning"
+                         th:text="${batterStats.totalBases != null ? batterStats.totalBases : '-'}"></div>
+                    <div class="text-muted small">루타 (TB)</div>
+                </div>
+            </div>
+        </div>
+        <div th:if="${batterStats == null}" class="text-muted small fst-italic">
+            세부 기록이 아직 수집되지 않았습니다.
+        </div>
+    </div>
+
+    <!-- 투수 세부 기록 -->
+    <div th:if="${player.pitcher}">
+        <h5 class="mb-3">
+            <i class="bi bi-table text-danger"></i> 세부 기록
+        </h5>
+        <div th:if="${pitcherStats != null}" class="row g-2">
+            <div class="col-6 col-md-3 col-lg-2">
+                <div class="card text-center py-2 h-100">
+                    <div class="fw-bold fs-4 text-danger"
+                         th:text="${pitcherStats.inningsDisplay != null ? pitcherStats.inningsDisplay : '-'}"></div>
+                    <div class="text-muted small">이닝 (IP)</div>
+                </div>
+            </div>
+            <div class="col-6 col-md-3 col-lg-2">
+                <div class="card text-center py-2 h-100">
+                    <div class="fw-bold fs-4"
+                         th:text="${pitcherStats.hitsAllowed != null ? pitcherStats.hitsAllowed : '-'}"></div>
+                    <div class="text-muted small">피안타 (H)</div>
+                </div>
+            </div>
+            <div class="col-6 col-md-3 col-lg-2">
+                <div class="card text-center py-2 h-100">
+                    <div class="fw-bold fs-4 text-warning"
+                         th:text="${pitcherStats.walksAllowed != null ? pitcherStats.walksAllowed : '-'}"></div>
+                    <div class="text-muted small">볼넷 (BB)</div>
+                </div>
+            </div>
+            <div class="col-6 col-md-3 col-lg-2">
+                <div class="card text-center py-2 h-100">
+                    <div class="fw-bold fs-4 text-primary"
+                         th:text="${pitcherStats.strikeouts != null ? pitcherStats.strikeouts : '-'}"></div>
+                    <div class="text-muted small">탈삼진 (SO)</div>
+                </div>
+            </div>
+            <div class="col-6 col-md-3 col-lg-2">
+                <div class="card text-center py-2 h-100">
+                    <div class="fw-bold fs-4 text-danger"
+                         th:text="${pitcherStats.earnedRuns != null ? pitcherStats.earnedRuns : '-'}"></div>
+                    <div class="text-muted small">자책점 (ER)</div>
+                </div>
+            </div>
+            <div class="col-6 col-md-3 col-lg-2">
+                <div class="card text-center py-2 h-100">
+                    <div class="fw-bold fs-4 text-success"
+                         th:text="${pitcherStats.qualityStarts != null ? pitcherStats.qualityStarts : '-'}"></div>
+                    <div class="text-muted small">퀄리티스타트 (QS)</div>
+                </div>
+            </div>
+        </div>
+        <div th:if="${pitcherStats == null}" class="text-muted small fst-italic">
+            세부 기록이 아직 수집되지 않았습니다.
+        </div>
+    </div>
+</div>
+
+<!-- ── 섹션 2: 세이버메트릭스 ──────────────────────────────────────── -->
+<div class="mt-4"
+     th:if="${(player.batter and batterStats != null) or (player.pitcher and pitcherStats != null)}">
+    <h5 class="mb-3">
+        <i class="bi bi-graph-up-arrow"></i> 세이버메트릭스
+        <span class="badge bg-secondary fw-normal ms-1">고급 지표</span>
+    </h5>
+
+    <!-- 타자 세이버메트릭스 -->
+    <div th:if="${player.batter}" class="row g-3">
+
+        <!-- OPS (리그 평균 있음) -->
+        <div class="col-6 col-md-4 col-lg-3">
+            <div class="card text-center h-100 border-primary">
+                <div class="card-body py-3">
+                    <div class="text-muted small mb-1">OPS</div>
+                    <div class="fs-2 fw-bold text-primary"
+                         th:text="${ops != null ? #numbers.formatDecimal(ops, 1, 3) : '-'}"></div>
+                    <hr class="my-2">
+                    <div class="text-muted" style="font-size:.75rem">리그 평균</div>
+                    <div class="small" th:text="${leagueOps != null ? #numbers.formatDecimal(leagueOps, 1, 3) : '-'}"></div>
+                    <th:block th:if="${ops != null and leagueOps != null}"
+                              th:with="diff=${ops.subtract(leagueOps)}">
+                        <div class="small fw-bold mt-1"
+                             th:class="${diff.signum() > 0 ? 'text-success' : (diff.signum() < 0 ? 'text-danger' : 'text-muted')}"
+                             th:text="${(diff.signum() > 0 ? '+' : '') + #numbers.formatDecimal(diff, 1, 3)}"></div>
+                    </th:block>
+                </div>
+            </div>
+        </div>
+
+        <!-- OBP (리그 평균 있음) -->
+        <div class="col-6 col-md-4 col-lg-3">
+            <div class="card text-center h-100">
+                <div class="card-body py-3">
+                    <div class="text-muted small mb-1">OBP</div>
+                    <div class="fs-2 fw-bold"
+                         th:text="${obp != null ? #numbers.formatDecimal(obp, 1, 3) : '-'}"></div>
+                    <hr class="my-2">
+                    <div class="text-muted" style="font-size:.75rem">리그 평균</div>
+                    <div class="small" th:text="${leagueObp != null ? #numbers.formatDecimal(leagueObp, 1, 3) : '-'}"></div>
+                    <th:block th:if="${obp != null and leagueObp != null}"
+                              th:with="diff=${obp.subtract(leagueObp)}">
+                        <div class="small fw-bold mt-1"
+                             th:class="${diff.signum() > 0 ? 'text-success' : (diff.signum() < 0 ? 'text-danger' : 'text-muted')}"
+                             th:text="${(diff.signum() > 0 ? '+' : '') + #numbers.formatDecimal(diff, 1, 3)}"></div>
+                    </th:block>
+                </div>
+            </div>
+        </div>
+
+        <!-- SLG (리그 평균 있음) -->
+        <div class="col-6 col-md-4 col-lg-3">
+            <div class="card text-center h-100">
+                <div class="card-body py-3">
+                    <div class="text-muted small mb-1">SLG</div>
+                    <div class="fs-2 fw-bold"
+                         th:text="${slg != null ? #numbers.formatDecimal(slg, 1, 3) : '-'}"></div>
+                    <hr class="my-2">
+                    <div class="text-muted" style="font-size:.75rem">리그 평균</div>
+                    <div class="small" th:text="${leagueSlg != null ? #numbers.formatDecimal(leagueSlg, 1, 3) : '-'}"></div>
+                    <th:block th:if="${slg != null and leagueSlg != null}"
+                              th:with="diff=${slg.subtract(leagueSlg)}">
+                        <div class="small fw-bold mt-1"
+                             th:class="${diff.signum() > 0 ? 'text-success' : (diff.signum() < 0 ? 'text-danger' : 'text-muted')}"
+                             th:text="${(diff.signum() > 0 ? '+' : '') + #numbers.formatDecimal(diff, 1, 3)}"></div>
+                    </th:block>
+                </div>
+            </div>
+        </div>
+
+        <!-- ISO (리그 평균 없음) -->
+        <div class="col-6 col-md-4 col-lg-3">
+            <div class="card text-center h-100">
+                <div class="card-body py-3">
+                    <div class="text-muted small mb-1">ISO</div>
+                    <div class="fs-2 fw-bold"
+                         th:text="${iso != null ? #numbers.formatDecimal(iso, 1, 3) : '-'}"></div>
+                    <hr class="my-2">
+                    <div class="text-muted" style="font-size:.75rem">리그 평균</div>
+                    <div class="small" th:text="${leagueIso != null ? #numbers.formatDecimal(leagueIso, 1, 3) : '-'}"></div>
+                    <th:block th:if="${iso != null and leagueIso != null}"
+                              th:with="diff=${iso.subtract(leagueIso)}">
+                        <div class="small fw-bold mt-1"
+                             th:class="${diff.signum() > 0 ? 'text-success' : (diff.signum() < 0 ? 'text-danger' : 'text-muted')}"
+                             th:text="${(diff.signum() > 0 ? '+' : '') + #numbers.formatDecimal(diff, 1, 3)}"></div>
+                    </th:block>
+                </div>
+            </div>
+        </div>
+
+        <!-- BB/K (리그 평균 없음) -->
+        <div class="col-6 col-md-4 col-lg-3">
+            <div class="card text-center h-100">
+                <div class="card-body py-3">
+                    <div class="text-muted small mb-1">BB/K</div>
+                    <div class="fs-2 fw-bold"
+                         th:text="${bbPerK != null ? #numbers.formatDecimal(bbPerK, 1, 3) : '-'}"></div>
+                    <hr class="my-2">
+                    <div class="text-muted" style="font-size:.75rem">리그 평균</div>
+                    <div class="small" th:text="${leagueBbPerK != null ? #numbers.formatDecimal(leagueBbPerK, 1, 3) : '-'}"></div>
+                    <th:block th:if="${bbPerK != null and leagueBbPerK != null}"
+                              th:with="diff=${bbPerK.subtract(leagueBbPerK)}">
+                        <div class="small fw-bold mt-1"
+                             th:class="${diff.signum() > 0 ? 'text-success' : (diff.signum() < 0 ? 'text-danger' : 'text-muted')}"
+                             th:text="${(diff.signum() > 0 ? '+' : '') + #numbers.formatDecimal(diff, 1, 3)}"></div>
+                    </th:block>
+                </div>
+            </div>
+        </div>
+
+        <!-- BABIP (리그 평균 없음) -->
+        <div class="col-6 col-md-4 col-lg-3">
+            <div class="card text-center h-100">
+                <div class="card-body py-3">
+                    <div class="text-muted small mb-1">BABIP</div>
+                    <div class="fs-2 fw-bold"
+                         th:text="${babip != null ? #numbers.formatDecimal(babip, 1, 3) : '-'}"></div>
+                    <hr class="my-2">
+                    <div class="text-muted" style="font-size:.75rem">리그 평균</div>
+                    <div class="small" th:text="${leagueBabip != null ? #numbers.formatDecimal(leagueBabip, 1, 3) : '-'}"></div>
+                    <th:block th:if="${babip != null and leagueBabip != null}"
+                              th:with="diff=${babip.subtract(leagueBabip)}">
+                        <div class="small fw-bold mt-1"
+                             th:class="${diff.signum() > 0 ? 'text-success' : (diff.signum() < 0 ? 'text-danger' : 'text-muted')}"
+                             th:text="${(diff.signum() > 0 ? '+' : '') + #numbers.formatDecimal(diff, 1, 3)}"></div>
+                    </th:block>
+                </div>
+            </div>
+        </div>
+
+        <!-- wOBA (리그 평균 없음) -->
+        <div class="col-6 col-md-4 col-lg-3">
+            <div class="card text-center h-100">
+                <div class="card-body py-3">
+                    <div class="text-muted small mb-1">wOBA</div>
+                    <div class="fs-2 fw-bold text-success"
+                         th:text="${woba != null ? #numbers.formatDecimal(woba, 1, 3) : '-'}"></div>
+                    <hr class="my-2">
+                    <div class="text-muted" style="font-size:.75rem">리그 평균</div>
+                    <div class="small" th:text="${leagueWoba != null ? #numbers.formatDecimal(leagueWoba, 1, 3) : '-'}"></div>
+                    <th:block th:if="${woba != null and leagueWoba != null}"
+                              th:with="diff=${woba.subtract(leagueWoba)}">
+                        <div class="small fw-bold mt-1"
+                             th:class="${diff.signum() > 0 ? 'text-success' : (diff.signum() < 0 ? 'text-danger' : 'text-muted')}"
+                             th:text="${(diff.signum() > 0 ? '+' : '') + #numbers.formatDecimal(diff, 1, 3)}"></div>
+                    </th:block>
+                </div>
+            </div>
+        </div>
+
+    </div><!-- /타자 세이버메트릭스 -->
+
+    <!-- 투수 세이버메트릭스 -->
+    <div th:if="${player.pitcher}" class="row g-3">
+
+        <!-- WHIP (리그 평균 있음) -->
+        <div class="col-6 col-md-4 col-lg-3">
+            <div class="card text-center h-100 border-danger">
+                <div class="card-body py-3">
+                    <div class="text-muted small mb-1">WHIP</div>
+                    <div class="fs-2 fw-bold text-danger"
+                         th:text="${whip != null ? #numbers.formatDecimal(whip, 1, 2) : '-'}"></div>
+                    <hr class="my-2">
+                    <div class="text-muted" style="font-size:.75rem">리그 평균</div>
+                    <div class="small" th:text="${leagueWhip != null ? #numbers.formatDecimal(leagueWhip, 1, 2) : '-'}"></div>
+                    <th:block th:if="${whip != null and leagueWhip != null}"
+                              th:with="diff=${whip.subtract(leagueWhip)}">
+                        <div class="small fw-bold mt-1"
+                             th:class="${diff.signum() < 0 ? 'text-success' : (diff.signum() > 0 ? 'text-danger' : 'text-muted')}"
+                             th:text="${(diff.signum() > 0 ? '+' : '') + #numbers.formatDecimal(diff, 1, 2)}"></div>
+                    </th:block>
+                </div>
+            </div>
+        </div>
+
+        <!-- K/9 -->
+        <div class="col-6 col-md-4 col-lg-3">
+            <div class="card text-center h-100">
+                <div class="card-body py-3">
+                    <div class="text-muted small mb-1">K/9</div>
+                    <div class="fs-2 fw-bold text-primary"
+                         th:text="${kPer9 != null ? #numbers.formatDecimal(kPer9, 1, 2) : '-'}"></div>
+                    <hr class="my-2">
+                    <div class="text-muted" style="font-size:.75rem">리그 평균</div>
+                    <div class="small" th:text="${leagueKper9 != null ? #numbers.formatDecimal(leagueKper9, 1, 2) : '-'}"></div>
+                    <th:block th:if="${kPer9 != null and leagueKper9 != null}"
+                              th:with="diff=${kPer9.subtract(leagueKper9)}">
+                        <div class="small fw-bold mt-1"
+                             th:class="${diff.signum() > 0 ? 'text-success' : (diff.signum() < 0 ? 'text-danger' : 'text-muted')}"
+                             th:text="${(diff.signum() > 0 ? '+' : '') + #numbers.formatDecimal(diff, 1, 2)}"></div>
+                    </th:block>
+                </div>
+            </div>
+        </div>
+
+        <!-- BB/9 -->
+        <div class="col-6 col-md-4 col-lg-3">
+            <div class="card text-center h-100">
+                <div class="card-body py-3">
+                    <div class="text-muted small mb-1">BB/9</div>
+                    <div class="fs-2 fw-bold"
+                         th:text="${bbPer9 != null ? #numbers.formatDecimal(bbPer9, 1, 2) : '-'}"></div>
+                    <hr class="my-2">
+                    <div class="text-muted" style="font-size:.75rem">리그 평균</div>
+                    <div class="small" th:text="${leagueBbPer9 != null ? #numbers.formatDecimal(leagueBbPer9, 1, 2) : '-'}"></div>
+                    <th:block th:if="${bbPer9 != null and leagueBbPer9 != null}"
+                              th:with="diff=${bbPer9.subtract(leagueBbPer9)}">
+                        <div class="small fw-bold mt-1"
+                             th:class="${diff.signum() < 0 ? 'text-success' : (diff.signum() > 0 ? 'text-danger' : 'text-muted')}"
+                             th:text="${(diff.signum() > 0 ? '+' : '') + #numbers.formatDecimal(diff, 1, 2)}"></div>
+                    </th:block>
+                </div>
+            </div>
+        </div>
+
+        <!-- K/BB -->
+        <div class="col-6 col-md-4 col-lg-3">
+            <div class="card text-center h-100">
+                <div class="card-body py-3">
+                    <div class="text-muted small mb-1">K/BB</div>
+                    <div class="fs-2 fw-bold text-success"
+                         th:text="${kPerBb != null ? #numbers.formatDecimal(kPerBb, 1, 2) : '-'}"></div>
+                    <hr class="my-2">
+                    <div class="text-muted" style="font-size:.75rem">리그 평균</div>
+                    <div class="small" th:text="${leagueKperBb != null ? #numbers.formatDecimal(leagueKperBb, 1, 2) : '-'}"></div>
+                    <th:block th:if="${kPerBb != null and leagueKperBb != null}"
+                              th:with="diff=${kPerBb.subtract(leagueKperBb)}">
+                        <div class="small fw-bold mt-1"
+                             th:class="${diff.signum() > 0 ? 'text-success' : (diff.signum() < 0 ? 'text-danger' : 'text-muted')}"
+                             th:text="${(diff.signum() > 0 ? '+' : '') + #numbers.formatDecimal(diff, 1, 2)}"></div>
+                    </th:block>
+                </div>
+            </div>
+        </div>
+
+        <!-- HR/9 -->
+        <div class="col-6 col-md-4 col-lg-3">
+            <div class="card text-center h-100">
+                <div class="card-body py-3">
+                    <div class="text-muted small mb-1">HR/9</div>
+                    <div class="fs-2 fw-bold text-warning"
+                         th:text="${hrPer9 != null ? #numbers.formatDecimal(hrPer9, 1, 2) : '-'}"></div>
+                    <hr class="my-2">
+                    <div class="text-muted" style="font-size:.75rem">리그 평균</div>
+                    <div class="small" th:text="${leagueHrPer9 != null ? #numbers.formatDecimal(leagueHrPer9, 1, 2) : '-'}"></div>
+                    <th:block th:if="${hrPer9 != null and leagueHrPer9 != null}"
+                              th:with="diff=${hrPer9.subtract(leagueHrPer9)}">
+                        <div class="small fw-bold mt-1"
+                             th:class="${diff.signum() < 0 ? 'text-success' : (diff.signum() > 0 ? 'text-danger' : 'text-muted')}"
+                             th:text="${(diff.signum() > 0 ? '+' : '') + #numbers.formatDecimal(diff, 1, 2)}"></div>
+                    </th:block>
+                </div>
+            </div>
+        </div>
+
+        <!-- FIP -->
+        <div class="col-6 col-md-4 col-lg-3">
+            <div class="card text-center h-100">
+                <div class="card-body py-3">
+                    <div class="text-muted small mb-1">FIP</div>
+                    <div class="fs-2 fw-bold"
+                         th:text="${fip != null ? #numbers.formatDecimal(fip, 1, 2) : '-'}"></div>
+                    <hr class="my-2">
+                    <div class="text-muted" style="font-size:.75rem">리그 ERA</div>
+                    <div class="small" th:text="${leagueEra != null ? #numbers.formatDecimal(leagueEra, 1, 2) : '-'}"></div>
+                    <th:block th:if="${fip != null and leagueEra != null}"
+                              th:with="diff=${fip.subtract(leagueEra)}">
+                        <div class="small fw-bold mt-1"
+                             th:class="${diff.signum() < 0 ? 'text-success' : (diff.signum() > 0 ? 'text-danger' : 'text-muted')}"
+                             th:text="${(diff.signum() > 0 ? '+' : '') + #numbers.formatDecimal(diff, 1, 2)}"></div>
+                    </th:block>
+                </div>
+            </div>
+        </div>
+
+    </div><!-- /투수 세이버메트릭스 -->
+</div>
+
+<!-- ── 섹션 3: KBO 데이터 검증 배지 ──────────────────────────────── -->
+<div class="mt-3"
+     th:if="${(player.batter and batterStats != null) or (player.pitcher and pitcherStats != null)}">
+    <span class="badge rounded-pill bg-success bg-opacity-10 border border-success text-success px-3 py-2">
+        <i class="bi bi-patch-check-fill me-1"></i>
+        <th:block th:if="${player.batter}">
+            이 선수의 OPS, OBP, SLG 값은 KBO 공식 데이터와 대조 검증됨
+        </th:block>
+        <th:block th:if="${player.pitcher}">
+            이 선수의 WHIP 값은 KBO 공식 데이터와 대조 검증됨
+        </th:block>
+    </span>
+</div>
+
+<!-- ── 하단 버튼 ──────────────────────────────────────────────────── -->
 <div class="mt-3">
     <a th:href="@{/players}" class="btn btn-outline-secondary">
         <i class="bi bi-arrow-left"></i> 목록으로
