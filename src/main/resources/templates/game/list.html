@@ -4,16 +4,15 @@
           title='경기 일정',
           content=~{::main-content},
           extraHead=~{::game-list-css},
-          extraScript=~{})}">
+          extraScript=~{::game-list-script})}">
 <head><title>경기 일정</title></head>
 <body>
 
+<!-- ── CSS ── -->
 <th:block th:fragment="game-list-css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.css">
 <style>
-/* ── 홈/원정 구분 (굵기) ── */
-.team-home { font-weight: 600; }
-.team-away { font-weight: 500; }
-/* ── 팀 대표 색상 (홈·원정 공통) ── */
+/* ── 팀 텍스트 색상 (다른 페이지 공용, 건드리지 말 것) ── */
 .team-kia     { color: #EA0029; }
 .team-doosan  { color: #131230; }
 .team-lg      { color: #C30452; }
@@ -24,183 +23,461 @@
 .team-hanwha  { color: #FC4E00; }
 .team-nc      { color: #1D467D; }
 .team-kiwoom  { color: #820024; }
-/* ── 승/패 강조 (색상보다 우선) ── */
-.team-winner  { font-weight: 700 !important; }
-.team-loser   { color: #999 !important; font-weight: 400 !important; }
+.team-home   { font-weight: 600; }
+.team-away   { font-weight: 500; }
+.team-winner { font-weight: 700 !important; }
+.team-loser  { color: #999 !important; font-weight: 400 !important; }
+
+/* ── FullCalendar 기본 이벤트 박스 제거 ── */
+.fc-daygrid-event {
+  background: none !important;
+  border: none !important;
+  padding: 0 !important;
+  margin: 2px 0 !important;
+}
+.fc-event-title, .fc-event-time { display: none !important; }
+.fc-daygrid-event:hover { background: rgba(0,0,0,0.04) !important; }
+.fc-daygrid-day-frame { padding: 2px; }
+
+/* ── 캘린더 기본 설정 ── */
+#calendar { min-height: 600px; }
+.fc .fc-toolbar-title { font-size: 1.1rem; font-weight: 600; }
+
+/* ── 커스텀 게임 행 ── */
+.game-row {
+  display: grid;
+  grid-template-columns: 38px 18px 18px 38px;
+  gap: 4px;
+  align-items: center;
+  font-size: 11px;
+  line-height: 1.4;
+  cursor: pointer;
+}
+.game-row .badge-team {
+  padding: 1px 0;
+  text-align: center;
+  border-radius: 10px;
+  font-weight: 500;
+  font-size: 10px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.score-winner { color: #E24B4A; font-weight: 500; text-align: right; }
+.score-loser  { color: #888; text-align: left; }
+.score-tie    { color: #333; }
+.score-tie-l  { text-align: right; }
+.score-tie-r  { text-align: left; }
+.game-row .stadium {
+  font-size: 10px;
+  color: #666;
+  text-align: center;
+  grid-column: 2 / 4;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 </style>
 </th:block>
+
+<!-- ── 본문 ── -->
 <th:block th:fragment="main-content">
 
 <!-- 페이지 헤더 -->
 <div class="d-flex justify-content-between align-items-center mb-3">
     <h4 class="mb-0">
         <i class="bi bi-calendar3 text-primary"></i> 경기 일정
-        <small class="text-muted fw-normal ms-2 fs-6" th:text="${selectedMonthDisplay}"></small>
     </h4>
-    <!-- 관리자 전용: 크롤링 버튼 -->
-    <div sec:authorize="hasRole('ADMIN')" class="d-flex gap-2">
-        <form th:action="@{/games/crawl}" method="post" class="d-inline">
-            <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
-            <button type="submit" class="btn btn-outline-info btn-sm"
-                    onclick="return confirm('시즌 전체 경기 데이터를 갱신합니다. 약 2분 소요됩니다. 계속하시겠습니까?')">
-                <i class="bi bi-cloud-download"></i> 데이터 갱신
+    <div class="d-flex align-items-center gap-2">
+        <!-- 뷰 토글 -->
+        <div class="btn-group btn-group-sm" role="group">
+            <button type="button" id="btnCalendar" class="btn btn-primary"
+                    onclick="switchView('calendar')">
+                <i class="bi bi-calendar3"></i> 달력
             </button>
-        </form>
+            <button type="button" id="btnList" class="btn btn-outline-secondary"
+                    onclick="switchView('list')">
+                <i class="bi bi-list-ul"></i> 목록
+            </button>
+        </div>
+        <!-- 관리자 크롤링 -->
+        <div sec:authorize="hasRole('ADMIN')">
+            <form th:action="@{/games/crawl}" method="post" class="d-inline">
+                <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
+                <button type="submit" class="btn btn-outline-info btn-sm"
+                        onclick="return confirm('시즌 전체 경기 데이터를 갱신합니다. 약 2분 소요됩니다. 계속하시겠습니까?')">
+                    <i class="bi bi-cloud-download"></i> 데이터 갱신
+                </button>
+            </form>
+        </div>
     </div>
 </div>
 
-<!-- 월 네비게이션 -->
-<div class="d-flex align-items-center gap-2 mb-3">
-    <!-- 이전 달 -->
-    <a th:if="${prevMonth != null}"
-       th:href="@{/games(month=${prevMonth}, team=${selectedTeam})}"
-       class="btn btn-outline-secondary btn-sm">
-        <i class="bi bi-chevron-left"></i>
-    </a>
-    <span th:if="${prevMonth == null}" class="btn btn-outline-secondary btn-sm disabled">
-        <i class="bi bi-chevron-left"></i>
-    </span>
-
-    <!-- 월 선택 드롭다운 -->
-    <form th:action="@{/games}" method="get" class="d-flex align-items-center gap-1 flex-grow-1">
-        <input type="hidden" name="team" th:value="${selectedTeam}">
-        <select name="month" class="form-select form-select-sm" style="max-width:160px;"
-                onchange="this.form.submit()">
-            <option th:each="opt : ${monthOptions}"
-                    th:value="${opt[0]}"
-                    th:text="${opt[1]}"
-                    th:selected="${opt[0] == selectedMonth}"></option>
-        </select>
-        <span th:if="${isCurrentMonth}" class="badge bg-primary ms-1">이번 달</span>
-    </form>
-
-    <!-- 다음 달 -->
-    <a th:if="${nextMonth != null}"
-       th:href="@{/games(month=${nextMonth}, team=${selectedTeam})}"
-       class="btn btn-outline-secondary btn-sm">
-        <i class="bi bi-chevron-right"></i>
-    </a>
-    <span th:if="${nextMonth == null}" class="btn btn-outline-secondary btn-sm disabled">
-        <i class="bi bi-chevron-right"></i>
-    </span>
-
-    <!-- 이번 달로 이동 -->
-    <a th:if="${!isCurrentMonth}"
-       th:href="@{/games(team=${selectedTeam})}"
-       class="btn btn-outline-primary btn-sm ms-1">
-        <i class="bi bi-house-fill"></i> 이번 달
-    </a>
-</div>
-
-<!-- 팀 필터 -->
-<div class="card mb-4">
+<!-- 팀 필터 (달력/목록 공통) -->
+<div class="card mb-3">
     <div class="card-body py-2">
-        <form th:action="@{/games}" method="get" class="d-flex align-items-center gap-2 flex-wrap">
-            <input type="hidden" name="month" th:value="${selectedMonth}">
+        <div class="d-flex align-items-center gap-2 flex-wrap">
             <label class="form-label mb-0 small text-muted fw-semibold">팀 필터:</label>
-            <select name="team" class="form-select form-select-sm" style="width:auto;">
-                <option value="ALL">전체 팀</option>
+            <select id="teamFilter" class="form-select form-select-sm" style="width:auto;"
+                    onchange="onTeamChange(this.value)">
+                <option value="ALL" th:selected="${selectedTeam == 'ALL' or selectedTeam == null}">전체 팀</option>
                 <option th:each="t : ${teams}"
                         th:value="${t}"
                         th:text="${t}"
                         th:selected="${t == selectedTeam}"></option>
             </select>
-            <button type="submit" class="btn btn-primary btn-sm">
-                <i class="bi bi-search"></i> 조회
-            </button>
-            <a th:href="@{/games(month=${selectedMonth})}" class="btn btn-outline-secondary btn-sm">초기화</a>
-            <span th:if="${selectedTeam != null and !#strings.isEmpty(selectedTeam)}"
-                  class="badge bg-warning text-dark ms-1">
+            <span th:if="${selectedTeam != null and selectedTeam != 'ALL'}"
+                  class="badge bg-warning text-dark">
                 <i class="bi bi-star-fill"></i>
                 <span th:text="${selectedTeam}"></span> 경기만 표시
             </span>
+        </div>
+    </div>
+</div>
+
+<!-- ── 달력 뷰 ── -->
+<div id="calendarView">
+    <div id="calendar"></div>
+</div>
+
+<!-- ── 목록 뷰 ── -->
+<div id="listView" style="display:none;">
+
+    <!-- 월 네비게이션 -->
+    <div class="d-flex align-items-center gap-2 mb-3">
+        <a th:if="${prevMonth != null}"
+           th:href="@{/games(month=${prevMonth}, team=${selectedTeam})}"
+           class="btn btn-outline-secondary btn-sm">
+            <i class="bi bi-chevron-left"></i>
+        </a>
+        <span th:if="${prevMonth == null}" class="btn btn-outline-secondary btn-sm disabled">
+            <i class="bi bi-chevron-left"></i>
+        </span>
+
+        <form th:action="@{/games}" method="get" class="d-flex align-items-center gap-1 flex-grow-1">
+            <input type="hidden" name="team" th:value="${selectedTeam}">
+            <select name="month" class="form-select form-select-sm" style="max-width:160px;"
+                    onchange="this.form.submit()">
+                <option th:each="opt : ${monthOptions}"
+                        th:value="${opt[0]}"
+                        th:text="${opt[1]}"
+                        th:selected="${opt[0] == selectedMonth}"></option>
+            </select>
+            <span th:if="${isCurrentMonth}" class="badge bg-primary ms-1">이번 달</span>
         </form>
-    </div>
-</div>
 
-<!-- 경기 없음 -->
-<div th:if="${isEmpty}" class="text-center py-5 text-muted">
-    <i class="bi bi-calendar-x fs-1 d-block mb-3"></i>
-    <h5 class="mb-2">아직 이 달의 일정이 확정되지 않았습니다</h5>
-    <p class="mb-3 small">
-        정규시즌은 3월~9월 초까지 진행되며,<br>
-        포스트시즌 일정은 정규시즌 종료 후 확정됩니다.
-    </p>
-    <small sec:authorize="hasRole('ADMIN')">
-        <a th:href="@{/games/crawl}" class="text-decoration-none">데이터 갱신</a>으로 최신 일정을 가져올 수 있습니다.
-    </small>
-</div>
+        <a th:if="${nextMonth != null}"
+           th:href="@{/games(month=${nextMonth}, team=${selectedTeam})}"
+           class="btn btn-outline-secondary btn-sm">
+            <i class="bi bi-chevron-right"></i>
+        </a>
+        <span th:if="${nextMonth == null}" class="btn btn-outline-secondary btn-sm disabled">
+            <i class="bi bi-chevron-right"></i>
+        </span>
 
-<!-- 날짜별 경기 목록 -->
-<div th:each="entry : ${gamesByDate}" class="mb-4">
-
-    <!-- 날짜 헤더 -->
-    <div class="d-flex align-items-center mb-2">
-        <h6 class="mb-0 fw-bold text-primary me-2"
-            th:text="${dateLabels[entry.key]}"></h6>
-        <span class="badge bg-secondary rounded-pill"
-              th:text="${entry.value.size()} + '경기'"></span>
+        <a th:if="${!isCurrentMonth}"
+           th:href="@{/games(team=${selectedTeam})}"
+           class="btn btn-outline-primary btn-sm ms-1">
+            <i class="bi bi-house-fill"></i> 이번 달
+        </a>
     </div>
 
-    <!-- 경기 카드 목록 -->
-    <div class="row g-2">
-        <div th:each="game : ${entry.value}" class="col-12 col-md-6 col-lg-4">
-            <div class="card h-100 shadow-sm"
-                 th:classappend="${game.status.name() == 'POSTPONED' or game.status.name() == 'CANCELED'} ? 'opacity-50'">
-                <div class="card-body py-2 px-3">
+    <!-- 경기 없음 -->
+    <div th:if="${isEmpty}" class="text-center py-5 text-muted">
+        <i class="bi bi-calendar-x fs-1 d-block mb-3"></i>
+        <h5 class="mb-2">아직 이 달의 일정이 확정되지 않았습니다</h5>
+        <p class="mb-3 small">
+            정규시즌은 3월~9월 초까지 진행되며,<br>
+            포스트시즌 일정은 정규시즌 종료 후 확정됩니다.
+        </p>
+    </div>
 
-                    <!-- 상태 뱃지 + 경기장 -->
-                    <div class="d-flex justify-content-between align-items-center mb-2">
-                        <span th:switch="${game.status.name()}">
-                            <span th:case="'SCHEDULED'"   class="badge bg-primary">예정</span>
-                            <span th:case="'IN_PROGRESS'" class="badge bg-warning text-dark">진행중</span>
-                            <span th:case="'FINISHED'"    class="badge bg-success">종료</span>
-                            <span th:case="'POSTPONED'"   class="badge bg-secondary">연기</span>
-                            <span th:case="'CANCELED'"    class="badge bg-danger">취소</span>
-                        </span>
-                        <small class="text-muted" th:text="${game.stadium != null ? game.stadium : ''}"></small>
-                    </div>
-
-                    <!-- 팀 vs 스코어 -->
-                    <div class="d-flex align-items-center justify-content-between">
-                        <!-- 원정팀 -->
-                        <div class="text-center" style="min-width:60px;">
-                            <div th:class="${game.awayTeamClass}"
-                                 th:text="${game.awayTeam}"></div>
-                            <small class="text-muted">원정</small>
+    <!-- 날짜별 경기 목록 -->
+    <div th:each="entry : ${gamesByDate}" class="mb-4">
+        <div class="d-flex align-items-center mb-2">
+            <h6 class="mb-0 fw-bold text-primary me-2"
+                th:text="${dateLabels[entry.key]}"></h6>
+            <span class="badge bg-secondary rounded-pill"
+                  th:text="${entry.value.size()} + '경기'"></span>
+        </div>
+        <div class="row g-2">
+            <div th:each="game : ${entry.value}" class="col-12 col-md-6 col-lg-4">
+                <div class="card h-100 shadow-sm"
+                     th:classappend="${game.status.name() == 'POSTPONED' or game.status.name() == 'CANCELED'} ? 'opacity-50'">
+                    <div class="card-body py-2 px-3">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <span th:switch="${game.status.name()}">
+                                <span th:case="'SCHEDULED'"   class="badge bg-primary">예정</span>
+                                <span th:case="'IN_PROGRESS'" class="badge bg-warning text-dark">진행중</span>
+                                <span th:case="'FINISHED'"    class="badge bg-success">종료</span>
+                                <span th:case="'POSTPONED'"   class="badge bg-secondary">연기</span>
+                                <span th:case="'CANCELED'"    class="badge bg-danger">취소</span>
+                            </span>
+                            <small class="text-muted" th:text="${game.stadium != null ? game.stadium : ''}"></small>
                         </div>
-
-                        <!-- 스코어 / vs -->
-                        <div class="text-center px-2">
-                            <div class="fs-5 fw-bold"
-                                 th:classappend="${game.status.name() == 'FINISHED'} ? 'text-dark' : 'text-muted'"
-                                 th:text="${game.resultText}"></div>
-                            <small class="text-muted"
-                                   th:text="${game.gameTime != null} ? ${#temporals.format(game.gameTime, 'HH:mm')} : ''"></small>
+                        <div class="d-flex align-items-center justify-content-between">
+                            <div class="text-center" style="min-width:60px;">
+                                <div th:class="${game.awayTeamClass}" th:text="${game.awayTeam}"></div>
+                                <small class="text-muted">원정</small>
+                            </div>
+                            <div class="text-center px-2">
+                                <div class="fs-5 fw-bold"
+                                     th:classappend="${game.status.name() == 'FINISHED'} ? 'text-dark' : 'text-muted'"
+                                     th:text="${game.resultText}"></div>
+                                <small class="text-muted"
+                                       th:text="${game.gameTime != null} ? ${#temporals.format(game.gameTime, 'HH:mm')} : ''"></small>
+                            </div>
+                            <div class="text-center" style="min-width:60px;">
+                                <div th:class="${game.homeTeamClass}" th:text="${game.homeTeam}"></div>
+                                <small class="text-muted">홈</small>
+                            </div>
                         </div>
-
-                        <!-- 홈팀 -->
-                        <div class="text-center" style="min-width:60px;">
-                            <div th:class="${game.homeTeamClass}"
-                                 th:text="${game.homeTeam}"></div>
-                            <small class="text-muted">홈</small>
+                        <div th:if="${game.notes != null and !#strings.isEmpty(game.notes)}" class="mt-1">
+                            <small class="text-secondary" th:text="${game.notes}"></small>
                         </div>
                     </div>
-
-                    <!-- 연기/취소 사유 -->
-                    <div th:if="${game.notes != null and !#strings.isEmpty(game.notes)}" class="mt-1">
-                        <small class="text-secondary" th:text="${game.notes}"></small>
-                    </div>
-
+                    <a th:href="@{/games/{id}(id=${game.id})}"
+                       class="stretched-link" aria-label="경기 상세"></a>
                 </div>
-                <!-- 상세 링크 -->
-                <a th:href="@{/games/{id}(id=${game.id})}"
-                   class="stretched-link" aria-label="경기 상세"></a>
+            </div>
+        </div>
+    </div>
+</div><!-- /listView -->
+
+<!-- ── 이벤트 클릭 모달 ── -->
+<div class="modal fade" id="gameModal" tabindex="-1" aria-labelledby="gameModalTitle" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header py-2">
+                <h6 class="modal-title" id="gameModalTitle">경기 정보</h6>
+                <button type="button" class="btn-close btn-sm" data-bs-dismiss="modal" aria-label="닫기"></button>
+            </div>
+            <div class="modal-body" id="gameModalBody"></div>
+            <div class="modal-footer py-2" id="gameModalFooter">
+                <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">닫기</button>
             </div>
         </div>
     </div>
 </div>
 
 </th:block>
+
+<!-- ── JS ── -->
+<th:block th:fragment="game-list-script">
+<script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.js"></script>
+<script th:inline="javascript">
+(function () {
+    var initialTeam = /*[[${selectedTeam}]]*/ 'ALL';
+    var currentTeam = initialTeam;
+    var calendar;
+
+    /* ── 팀 컬러 매핑 ── */
+    var TEAM_COLORS = {
+        'KIA':  '#EA0029', '두산': '#131230', 'LG':  '#C30452', 'SSG': '#CE0E2D',
+        '삼성': '#074CA1', 'KT':  '#EB1C24', '롯데': '#041E42', '한화': '#FC4E00',
+        'NC':   '#1D467D', '키움': '#820024'
+    };
+
+    /* ── 팀 배지 HTML 생성 ── */
+    function teamBadgeHtml(name, style) {
+        return '<div class="badge-team" style="' + style + '">' + (name || '') + '</div>';
+    }
+
+    /* ── 게임 행 렌더링 (캘린더 셀용) ── */
+    function renderGameRow(p) {
+        var aC = TEAM_COLORS[p.awayTeam] || '#666';
+        var hC = TEAM_COLORS[p.homeTeam] || '#666';
+        var awayBadge, homeBadge, middleHtml;
+
+        if (p.status === 'FINISHED' && p.awayScore != null && p.homeScore != null) {
+            var as = parseInt(p.awayScore, 10);
+            var hs = parseInt(p.homeScore, 10);
+            if (as === hs) {
+                awayBadge  = teamBadgeHtml(p.awayTeam, 'background:' + aC + ';color:#fff;');
+                homeBadge  = teamBadgeHtml(p.homeTeam, 'background:' + hC + ';color:#fff;');
+                middleHtml = '<div class="score-tie score-tie-l">' + as + '</div>' +
+                             '<div class="score-tie score-tie-r">' + hs + '</div>';
+            } else if (as > hs) {
+                awayBadge  = teamBadgeHtml(p.awayTeam, 'background:' + aC + ';color:#fff;');
+                homeBadge  = teamBadgeHtml(p.homeTeam, 'background:#fff;color:' + hC + ';border:1px solid ' + hC + ';opacity:0.6;');
+                middleHtml = '<div class="score-winner">' + as + '</div>' +
+                             '<div class="score-loser">'  + hs + '</div>';
+            } else {
+                awayBadge  = teamBadgeHtml(p.awayTeam, 'background:#fff;color:' + aC + ';border:1px solid ' + aC + ';opacity:0.6;');
+                homeBadge  = teamBadgeHtml(p.homeTeam, 'background:' + hC + ';color:#fff;');
+                middleHtml = '<div class="score-loser">'  + as + '</div>' +
+                             '<div class="score-winner">' + hs + '</div>';
+            }
+        } else if (p.status === 'CANCELED') {
+            awayBadge  = teamBadgeHtml(p.awayTeam, 'background:#fff;color:' + aC + ';border:1px solid ' + aC + ';');
+            homeBadge  = teamBadgeHtml(p.homeTeam, 'background:#fff;color:' + hC + ';border:1px solid ' + hC + ';');
+            middleHtml = '<div class="stadium">취소</div>';
+        } else if (p.status === 'POSTPONED') {
+            awayBadge  = teamBadgeHtml(p.awayTeam, 'background:#fff;color:' + aC + ';border:1px solid ' + aC + ';');
+            homeBadge  = teamBadgeHtml(p.homeTeam, 'background:#fff;color:' + hC + ';border:1px solid ' + hC + ';');
+            middleHtml = '<div class="stadium">연기</div>';
+        } else {
+            /* SCHEDULED / IN_PROGRESS */
+            awayBadge  = teamBadgeHtml(p.awayTeam, 'background:#fff;color:' + aC + ';border:1px solid ' + aC + ';');
+            homeBadge  = teamBadgeHtml(p.homeTeam, 'background:#fff;color:' + hC + ';border:1px solid ' + hC + ';');
+            var label  = (p.stadium && p.stadium !== '-') ? p.stadium
+                       : (p.gameTime ? p.gameTime.substring(0, 5) : '');
+            middleHtml = '<div class="stadium">' + label + '</div>';
+        }
+
+        return '<div class="game-row">' + awayBadge + middleHtml + homeBadge + '</div>';
+    }
+
+    /* ── 모달 표시 ── */
+    function showGameModal(info) {
+        var p   = info.event.extendedProps;
+        var gid = p.id || info.event.id;
+        var dt  = info.event.start;
+        var dateStr = dt ? (dt.getFullYear() + '년 ' + (dt.getMonth() + 1) + '월 ' + dt.getDate() + '일') : '';
+        var timeStr = p.gameTime ? p.gameTime.substring(0, 5) : '';
+
+        var aC = TEAM_COLORS[p.awayTeam] || '#666';
+        var hC = TEAM_COLORS[p.homeTeam] || '#666';
+
+        var statusMap = {
+            SCHEDULED: '예정', IN_PROGRESS: '진행중', FINISHED: '종료',
+            POSTPONED: '연기', CANCELED: '취소'
+        };
+        var badgeClsMap = {
+            SCHEDULED: 'bg-primary', IN_PROGRESS: 'bg-warning text-dark',
+            FINISHED: 'bg-success', POSTPONED: 'bg-secondary', CANCELED: 'bg-danger'
+        };
+
+        var statusLabel = statusMap[p.status] || p.status;
+        var badgeCls    = badgeClsMap[p.status] || 'bg-secondary';
+
+        /* 배지 스타일 + 점수/시간 */
+        var awayStyle, homeStyle, centerHtml;
+
+        if (p.status === 'FINISHED' && p.awayScore != null && p.homeScore != null) {
+            var as = parseInt(p.awayScore, 10);
+            var hs = parseInt(p.homeScore, 10);
+            if (as > hs) {
+                awayStyle   = 'background:' + aC + ';color:#fff;';
+                homeStyle   = 'background:#fff;color:' + hC + ';border:2px solid ' + hC + ';opacity:0.6;';
+                centerHtml  = '<div class="fw-bold fs-3 text-center lh-1">' +
+                              '<span style="color:#E24B4A;">' + as + '</span>' +
+                              '<span class="mx-1 text-muted fs-5">-</span>' +
+                              '<span style="color:#888;">' + hs + '</span></div>';
+            } else if (hs > as) {
+                awayStyle   = 'background:#fff;color:' + aC + ';border:2px solid ' + aC + ';opacity:0.6;';
+                homeStyle   = 'background:' + hC + ';color:#fff;';
+                centerHtml  = '<div class="fw-bold fs-3 text-center lh-1">' +
+                              '<span style="color:#888;">' + as + '</span>' +
+                              '<span class="mx-1 text-muted fs-5">-</span>' +
+                              '<span style="color:#E24B4A;">' + hs + '</span></div>';
+            } else {
+                awayStyle   = 'background:' + aC + ';color:#fff;';
+                homeStyle   = 'background:' + hC + ';color:#fff;';
+                centerHtml  = '<div class="fw-bold fs-3 text-center text-dark lh-1">' + as + ' - ' + hs + '</div>';
+            }
+            centerHtml += '<div class="text-center text-muted small mt-1">' + dateStr + '</div>';
+        } else {
+            awayStyle  = 'background:#fff;color:' + aC + ';border:2px solid ' + aC + ';';
+            homeStyle  = 'background:#fff;color:' + hC + ';border:2px solid ' + hC + ';';
+            centerHtml = timeStr
+                ? '<div class="fw-bold fs-4 text-center text-dark lh-1">' + timeStr + '</div>' +
+                  '<div class="text-center text-muted small mt-1">' + dateStr + '</div>'
+                : '<div class="text-center text-muted small">' + dateStr + '</div>';
+        }
+
+        var baseBadgeStyle = 'border-radius:10px;padding:4px 8px;font-weight:600;font-size:14px;min-width:52px;text-align:center;display:inline-block;';
+        var awayBadgeHtml  = '<div style="' + awayStyle + baseBadgeStyle + '">' + (p.awayTeam || '') + '</div>';
+        var homeBadgeHtml  = '<div style="' + homeStyle  + baseBadgeStyle + '">' + (p.homeTeam  || '') + '</div>';
+
+        document.getElementById('gameModalTitle').textContent =
+            (p.awayTeam || '') + ' vs ' + (p.homeTeam || '');
+
+        document.getElementById('gameModalBody').innerHTML =
+            '<div class="d-flex justify-content-between align-items-center mb-3">' +
+            '  <span class="badge ' + badgeCls + '">' + statusLabel + '</span>' +
+            '  <small class="text-muted">' + (p.stadium && p.stadium !== '-' ? p.stadium : '') + '</small>' +
+            '</div>' +
+            '<div class="d-flex align-items-center justify-content-around py-2">' +
+            '  <div class="text-center">' + awayBadgeHtml + '<div class="small text-muted mt-1">원정</div></div>' +
+            '  <div>' + centerHtml + '</div>' +
+            '  <div class="text-center">' + homeBadgeHtml + '<div class="small text-muted mt-1">홈</div></div>' +
+            '</div>';
+
+        document.getElementById('gameModalFooter').innerHTML =
+            '<a href="/games/' + gid + '" class="btn btn-outline-primary btn-sm">경기 상세 보기 →</a>' +
+            '<button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">닫기</button>';
+
+        new bootstrap.Modal(document.getElementById('gameModal')).show();
+    }
+
+    /* ── 뷰 전환 ── */
+    window.switchView = function (view) {
+        var calView = document.getElementById('calendarView');
+        var lstView = document.getElementById('listView');
+        var btnCal  = document.getElementById('btnCalendar');
+        var btnLst  = document.getElementById('btnList');
+        if (view === 'calendar') {
+            calView.style.display = '';
+            lstView.style.display = 'none';
+            btnCal.classList.replace('btn-outline-secondary', 'btn-primary');
+            btnLst.classList.replace('btn-primary', 'btn-outline-secondary');
+            if (calendar) calendar.updateSize();
+        } else {
+            calView.style.display = 'none';
+            lstView.style.display = '';
+            btnCal.classList.replace('btn-primary', 'btn-outline-secondary');
+            btnLst.classList.replace('btn-outline-secondary', 'btn-primary');
+        }
+    };
+
+    /* ── 팀 필터 변경 ── */
+    window.onTeamChange = function (val) {
+        currentTeam = val;
+        if (calendar) calendar.refetchEvents();
+    };
+
+    /* ── FullCalendar 초기화 ── */
+    document.addEventListener('DOMContentLoaded', function () {
+        var calEl = document.getElementById('calendar');
+        calendar = new FullCalendar.Calendar(calEl, {
+            locale: 'ko',
+            initialView: 'dayGridMonth',
+            headerToolbar: {
+                left:   'prev,next today',
+                center: 'title',
+                right:  'dayGridMonth,listMonth'
+            },
+            buttonText: {
+                today:     '오늘',
+                month:     '월',
+                listMonth: '목록'
+            },
+            height: 'auto',
+            events: function (fetchInfo, successCallback, failureCallback) {
+                var url = '/games/api/events' +
+                          '?start=' + fetchInfo.startStr.substring(0, 10) +
+                          '&end='   + fetchInfo.endStr.substring(0, 10) +
+                          (currentTeam && currentTeam !== 'ALL'
+                              ? '&team=' + encodeURIComponent(currentTeam) : '');
+                fetch(url)
+                    .then(function (r) { return r.json(); })
+                    .then(successCallback)
+                    .catch(failureCallback);
+            },
+            eventContent: function (arg) {
+                var wrap = document.createElement('div');
+                wrap.innerHTML = renderGameRow(arg.event.extendedProps);
+                return { domNodes: [wrap.firstElementChild] };
+            },
+            eventClick: showGameModal
+        });
+        calendar.render();
+    });
+})();
+</script>
+</th:block>
+
 </body>
 </html>

@@ -2,11 +2,13 @@ package com.kbo.stats.controller;
 
 import com.kbo.stats.domain.Game;
 import com.kbo.stats.domain.UserAccount;
+import com.kbo.stats.dto.CalendarEventDto;
 import com.kbo.stats.service.GameCrawler;
 import com.kbo.stats.service.GameService;
 import com.kbo.stats.service.UserAccountService;
 import io.swagger.v3.oas.annotations.Hidden;
 import lombok.RequiredArgsConstructor;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Controller;
@@ -104,6 +106,18 @@ public class GameController {
         model.addAttribute("isEmpty", gamesByDate.isEmpty());
 
         return "game/list";
+    }
+
+    /** FullCalendar JSON 이벤트 API */
+    @GetMapping("/api/events")
+    @ResponseBody
+    public List<CalendarEventDto> getEvents(
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate start,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate end,
+            @RequestParam(required = false) String team) {
+        LocalDate s = start != null ? start : LocalDate.now().withDayOfMonth(1);
+        LocalDate e = end != null ? end : s.plusMonths(1).minusDays(1);
+        return gameService.findEventsForCalendar(s, e, team);
     }
 
     /** 경기 상세 */
