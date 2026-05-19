@@ -15,15 +15,16 @@
         <result property="status"    column="status"
                 javaType="com.kbo.stats.domain.GameStatus"
                 typeHandler="org.apache.ibatis.type.EnumTypeHandler"/>
-        <result property="stadium"   column="stadium"/>
-        <result property="notes"     column="notes"/>
-        <result property="createdAt" column="created_at"/>
-        <result property="updatedAt" column="updated_at"/>
+        <result property="stadium"    column="stadium"/>
+        <result property="notes"      column="notes"/>
+        <result property="kboGameId"  column="kbo_game_id"/>
+        <result property="createdAt"  column="created_at"/>
+        <result property="updatedAt"  column="updated_at"/>
     </resultMap>
 
     <sql id="selectColumns">
         id, game_date, game_time, away_team, home_team,
-        away_score, home_score, status, stadium, notes,
+        away_score, home_score, status, stadium, notes, kbo_game_id,
         created_at, updated_at
     </sql>
 
@@ -110,6 +111,20 @@
           AND status IN ('SCHEDULED', 'POSTPONED')
         ORDER BY game_date ASC, game_time ASC
         LIMIT 1
+    </select>
+
+    <!-- kbo_game_id 갱신 -->
+    <update id="updateKboGameId">
+        UPDATE game SET kbo_game_id = #{kboGameId} WHERE id = #{id}
+    </update>
+
+    <!-- 기간 내 완료된 경기 조회 (박스스코어 크롤러용) -->
+    <select id="findFinishedByDateRange" resultMap="GameResultMap">
+        SELECT <include refid="selectColumns"/>
+        FROM game
+        WHERE game_date BETWEEN #{start} AND #{end}
+          AND status = 'FINISHED'
+        ORDER BY game_date, game_time
     </select>
 
     <!-- 경기 등록/업데이트 (날짜+팀 UNIQUE KEY 중복 시 점수·상태 갱신) -->

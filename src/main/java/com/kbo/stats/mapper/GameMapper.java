@@ -41,4 +41,10 @@ public interface GameMapper {
 
     /** 특정 팀의 다음 예정 경기 */
     Optional<Game> findNextByTeam(@Param("team") String team, @Param("afterDate") LocalDate afterDate);
+
+    /** kbo_game_id 설정 (박스스코어 수집 시) */
+    void updateKboGameId(@Param("id") Long id, @Param("kboGameId") String kboGameId);
+
+    /** 기간 내 완료된 경기 조회 (박스스코어 크롤러용) */
+    List<Game> findFinishedByDateRange(@Param("start") LocalDate start, @Param("end") LocalDate end);
 }

@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.kbo.stats.mapper.GameEventMapper">
+
+    <resultMap id="GameEventResultMap" type="com.kbo.stats.domain.GameEvent">
+        <id     property="id"              column="id"/>
+        <result property="gameId"          column="game_id"/>
+        <result property="eventType"       column="event_type"/>
+        <result property="playerName"      column="player_name"/>
+        <result property="inning"          column="inning"/>
+        <result property="seasonCount"     column="season_count"/>
+        <result property="runs"            column="runs"/>
+        <result property="opponentPitcher" column="opponent_pitcher"/>
+        <result property="rawText"         column="raw_text"/>
+        <result property="createdAt"       column="created_at"/>
+    </resultMap>
+
+    <insert id="insert" parameterType="com.kbo.stats.domain.GameEvent">
+        INSERT INTO game_event (game_id, event_type, player_name, inning,
+                                season_count, runs, opponent_pitcher, raw_text)
+        VALUES (#{gameId}, #{eventType}, #{playerName}, #{inning},
+                #{seasonCount}, #{runs}, #{opponentPitcher}, #{rawText})
+    </insert>
+
+    <delete id="deleteByGameId">
+        DELETE FROM game_event WHERE game_id = #{gameId}
+    </delete>
+
+    <select id="findByGameId" resultMap="GameEventResultMap">
+        SELECT * FROM game_event
+        WHERE game_id = #{gameId}
+        ORDER BY event_type, inning
+    </select>
+
+</mapper>

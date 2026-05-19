@@ -1,0 +1,90 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.kbo.stats.mapper.GameBoxScoreMapper">
+
+    <resultMap id="GameBoxScoreResultMap" type="com.kbo.stats.domain.GameBoxScore">
+        <id     property="id"            column="id"/>
+        <result property="gameId"        column="game_id"/>
+        <result property="leId"          column="le_id"/>
+        <result property="srId"          column="sr_id"/>
+        <result property="seasonId"      column="season_id"/>
+        <result property="crowdCn"       column="crowd_cn"/>
+        <result property="startTm"       column="start_tm"/>
+        <result property="endTm"         column="end_tm"/>
+        <result property="useTm"         column="use_tm"/>
+        <result property="maxInning"     column="max_inning"/>
+        <result property="realMaxInning" column="real_max_inning"/>
+        <result property="homeSeasonW"   column="home_season_w"/>
+        <result property="homeSeasonL"   column="home_season_l"/>
+        <result property="homeSeasonD"   column="home_season_d"/>
+        <result property="awaySeasonW"   column="away_season_w"/>
+        <result property="awaySeasonL"   column="away_season_l"/>
+        <result property="awaySeasonD"   column="away_season_d"/>
+        <result property="homeHits"      column="home_hits"/>
+        <result property="homeErrors"    column="home_errors"/>
+        <result property="homeWalks"     column="home_walks"/>
+        <result property="awayHits"      column="away_hits"/>
+        <result property="awayErrors"    column="away_errors"/>
+        <result property="awayWalks"     column="away_walks"/>
+        <result property="finishingHit"  column="finishing_hit"/>
+        <result property="umpires"       column="umpires"/>
+        <result property="createdAt"     column="created_at"/>
+        <result property="updatedAt"     column="updated_at"/>
+    </resultMap>
+
+    <insert id="upsert" parameterType="com.kbo.stats.domain.GameBoxScore">
+        INSERT INTO game_boxscore (
+            game_id, le_id, sr_id, season_id, crowd_cn,
+            start_tm, end_tm, use_tm, max_inning, real_max_inning,
+            home_season_w, home_season_l, home_season_d,
+            away_season_w, away_season_l, away_season_d,
+            home_hits, home_errors, home_walks,
+            away_hits, away_errors, away_walks,
+            finishing_hit, umpires
+        ) VALUES (
+            #{gameId}, #{leId}, #{srId}, #{seasonId}, #{crowdCn},
+            #{startTm}, #{endTm}, #{useTm}, #{maxInning}, #{realMaxInning},
+            #{homeSeasonW}, #{homeSeasonL}, #{homeSeasonD},
+            #{awaySeasonW}, #{awaySeasonL}, #{awaySeasonD},
+            #{homeHits}, #{homeErrors}, #{homeWalks},
+            #{awayHits}, #{awayErrors}, #{awayWalks},
+            #{finishingHit}, #{umpires}
+        )
+        ON DUPLICATE KEY UPDATE
+            le_id          = VALUES(le_id),
+            sr_id          = VALUES(sr_id),
+            season_id      = VALUES(season_id),
+            crowd_cn       = VALUES(crowd_cn),
+            start_tm       = VALUES(start_tm),
+            end_tm         = VALUES(end_tm),
+            use_tm         = VALUES(use_tm),
+            max_inning     = VALUES(max_inning),
+            real_max_inning = VALUES(real_max_inning),
+            home_season_w  = VALUES(home_season_w),
+            home_season_l  = VALUES(home_season_l),
+            home_season_d  = VALUES(home_season_d),
+            away_season_w  = VALUES(away_season_w),
+            away_season_l  = VALUES(away_season_l),
+            away_season_d  = VALUES(away_season_d),
+            home_hits      = VALUES(home_hits),
+            home_errors    = VALUES(home_errors),
+            home_walks     = VALUES(home_walks),
+            away_hits      = VALUES(away_hits),
+            away_errors    = VALUES(away_errors),
+            away_walks     = VALUES(away_walks),
+            finishing_hit  = VALUES(finishing_hit),
+            umpires        = VALUES(umpires),
+            updated_at     = CURRENT_TIMESTAMP
+    </insert>
+
+    <delete id="deleteByGameId">
+        DELETE FROM game_boxscore WHERE game_id = #{gameId}
+    </delete>
+
+    <select id="findByGameId" resultMap="GameBoxScoreResultMap">
+        SELECT * FROM game_boxscore WHERE game_id = #{gameId}
+    </select>
+
+</mapper>

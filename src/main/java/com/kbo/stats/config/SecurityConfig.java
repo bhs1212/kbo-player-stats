@@ -65,9 +65,13 @@ public class SecurityConfig {
                     new AntPathRequestMatcher("/api/v1/players/**", "PUT"),
                     new AntPathRequestMatcher("/api/v1/players/**", "DELETE")
                 ).hasRole("ADMIN")
-                // CrawlingController
+                // CrawlingController (선수 크롤링)
                 .requestMatchers(
                     new AntPathRequestMatcher("/crawling/run", "POST")
+                ).hasRole("ADMIN")
+                // BoxScoreCrawlController (박스스코어 수집)
+                .requestMatchers(
+                    new AntPathRequestMatcher("/crawling/boxscore", "POST")
                 ).hasRole("ADMIN")
                 // 경기 일정 크롤링 수동 트리거 (ADMIN 전용)
                 .requestMatchers(

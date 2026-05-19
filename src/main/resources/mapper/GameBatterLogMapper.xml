@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.kbo.stats.mapper.GameBatterLogMapper">
+
+    <resultMap id="GameBatterLogResultMap" type="com.kbo.stats.domain.GameBatterLog">
+        <id     property="id"            column="id"/>
+        <result property="gameId"        column="game_id"/>
+        <result property="teamSide"      column="team_side"/>
+        <result property="battingOrder"  column="batting_order"/>
+        <result property="position"      column="position"/>
+        <result property="playerName"    column="player_name"/>
+        <result property="atBats"        column="at_bats"/>
+        <result property="hits"          column="hits"/>
+        <result property="rbi"           column="rbi"/>
+        <result property="walks"         column="walks"/>
+        <result property="seasonAvg"     column="season_avg"/>
+        <result property="inningResults" column="inning_results"/>
+        <result property="createdAt"     column="created_at"/>
+    </resultMap>
+
+    <insert id="insert" parameterType="com.kbo.stats.domain.GameBatterLog">
+        INSERT INTO game_batter_log (
+            game_id, team_side, batting_order, position, player_name,
+            at_bats, hits, rbi, walks, season_avg, inning_results
+        ) VALUES (
+            #{gameId}, #{teamSide}, #{battingOrder}, #{position}, #{playerName},
+            #{atBats}, #{hits}, #{rbi}, #{walks}, #{seasonAvg}, #{inningResults}
+        )
+    </insert>
+
+    <delete id="deleteByGameId">
+        DELETE FROM game_batter_log WHERE game_id = #{gameId}
+    </delete>
+
+    <select id="findByGameId" resultMap="GameBatterLogResultMap">
+        SELECT * FROM game_batter_log
+        WHERE game_id = #{gameId}
+        ORDER BY team_side, batting_order
+    </select>
+
+</mapper>

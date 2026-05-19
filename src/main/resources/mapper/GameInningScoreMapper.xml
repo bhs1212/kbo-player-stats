@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.kbo.stats.mapper.GameInningScoreMapper">
+
+    <resultMap id="GameInningScoreResultMap" type="com.kbo.stats.domain.GameInningScore">
+        <id     property="id"        column="id"/>
+        <result property="gameId"    column="game_id"/>
+        <result property="inning"    column="inning"/>
+        <result property="teamSide"  column="team_side"/>
+        <result property="score"     column="score"/>
+        <result property="createdAt" column="created_at"/>
+    </resultMap>
+
+    <insert id="insert" parameterType="com.kbo.stats.domain.GameInningScore">
+        INSERT INTO game_inning_score (game_id, inning, team_side, score)
+        VALUES (#{gameId}, #{inning}, #{teamSide}, #{score})
+    </insert>
+
+    <delete id="deleteByGameId">
+        DELETE FROM game_inning_score WHERE game_id = #{gameId}
+    </delete>
+
+    <select id="findByGameId" resultMap="GameInningScoreResultMap">
+        SELECT * FROM game_inning_score
+        WHERE game_id = #{gameId}
+        ORDER BY team_side, inning
+    </select>
+
+</mapper>

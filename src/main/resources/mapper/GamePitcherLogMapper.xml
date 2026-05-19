@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.kbo.stats.mapper.GamePitcherLogMapper">
+
+    <resultMap id="GamePitcherLogResultMap" type="com.kbo.stats.domain.GamePitcherLog">
+        <id     property="id"                  column="id"/>
+        <result property="gameId"              column="game_id"/>
+        <result property="teamSide"            column="team_side"/>
+        <result property="pitchOrder"          column="pitch_order"/>
+        <result property="playerName"          column="player_name"/>
+        <result property="appearanceLabel"     column="appearance_label"/>
+        <result property="result"              column="result"/>
+        <result property="seasonW"             column="season_w"/>
+        <result property="seasonL"             column="season_l"/>
+        <result property="seasonS"             column="season_s"/>
+        <result property="inningsPitchedOuts"  column="innings_pitched_outs"/>
+        <result property="battersFaced"        column="batters_faced"/>
+        <result property="pitches"             column="pitches"/>
+        <result property="atBatsAgainst"       column="at_bats_against"/>
+        <result property="hitsAgainst"         column="hits_against"/>
+        <result property="homeRunsAgainst"     column="home_runs_against"/>
+        <result property="walksHbp"            column="walks_hbp"/>
+        <result property="strikeouts"          column="strikeouts"/>
+        <result property="runsAllowed"         column="runs_allowed"/>
+        <result property="earnedRuns"          column="earned_runs"/>
+        <result property="seasonEra"           column="season_era"/>
+        <result property="createdAt"           column="created_at"/>
+    </resultMap>
+
+    <insert id="insert" parameterType="com.kbo.stats.domain.GamePitcherLog">
+        INSERT INTO game_pitcher_log (
+            game_id, team_side, pitch_order, player_name, appearance_label,
+            result, season_w, season_l, season_s,
+            innings_pitched_outs, batters_faced, pitches,
+            at_bats_against, hits_against, home_runs_against,
+            walks_hbp, strikeouts, runs_allowed, earned_runs, season_era
+        ) VALUES (
+            #{gameId}, #{teamSide}, #{pitchOrder}, #{playerName}, #{appearanceLabel},
+            #{result}, #{seasonW}, #{seasonL}, #{seasonS},
+            #{inningsPitchedOuts}, #{battersFaced}, #{pitches},
+            #{atBatsAgainst}, #{hitsAgainst}, #{homeRunsAgainst},
+            #{walksHbp}, #{strikeouts}, #{runsAllowed}, #{earnedRuns}, #{seasonEra}
+        )
+    </insert>
+
+    <delete id="deleteByGameId">
+        DELETE FROM game_pitcher_log WHERE game_id = #{gameId}
+    </delete>
+
+    <select id="findByGameId" resultMap="GamePitcherLogResultMap">
+        SELECT * FROM game_pitcher_log
+        WHERE game_id = #{gameId}
+        ORDER BY team_side, pitch_order
+    </select>
+
+</mapper>

@@ -25,6 +25,7 @@ public class Game {
     private GameStatus status;
     private String stadium;
     private String notes;
+    private String kboGameId;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 
