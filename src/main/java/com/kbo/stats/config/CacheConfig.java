@@ -38,6 +38,13 @@ public class CacheConfig {
                         .maximumSize(50)
                         .<Object, Object>build());
 
+        // 리그 분포 캐시: 백분위 계산용 전체 리스트 (5분)
+        manager.registerCustomCache("league_distributions",
+                Caffeine.newBuilder()
+                        .expireAfterWrite(5, TimeUnit.MINUTES)
+                        .maximumSize(20)
+                        .<Object, Object>build());
+
         return manager;
     }
 }

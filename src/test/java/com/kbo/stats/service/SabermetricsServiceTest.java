@@ -6,6 +6,7 @@ import com.kbo.stats.domain.StatValidationLog;
 import com.kbo.stats.dto.LeagueTotalsDto;
 import com.kbo.stats.mapper.BatterStatsMapper;
 import com.kbo.stats.mapper.PitcherStatsMapper;
+import com.kbo.stats.mapper.PlayerMapper;
 import com.kbo.stats.mapper.StatValidationLogMapper;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -27,6 +28,7 @@ class SabermetricsServiceTest {
     @Mock private BatterStatsMapper batterStatsMapper;
     @Mock private PitcherStatsMapper pitcherStatsMapper;
     @Mock private StatValidationLogMapper statValidationLogMapper;
+    @Mock private PlayerMapper playerMapper;
 
     @InjectMocks
     private SabermetricsService sabermetricsService;
@@ -266,5 +268,56 @@ class SabermetricsServiceTest {
         assertThat(sabermetricsService.calculateOPS(null, 100)).isNull();
         assertThat(sabermetricsService.calculateKper9(null)).isNull();
         assertThat(sabermetricsService.calculateFIP(null, BigDecimal.ONE)).isNull();
+    }
+
+    // ──────────────────────────────────────────────────────────────
+    // calculatePercentile 테스트
+    // ──────────────────────────────────────────────────────────────
+
+    @Test
+    @DisplayName("상위값_높을수록좋음: [1.0~0.2] 중 0.9 → rank=1 → 백분위 80")
+    void calculatePercentile_상위값_높을수록좋음() {
+        // sorted desc: [1.0, 0.8, 0.6, 0.4, 0.2], target=0.9
+        // 0.9 < 1.0 → rank=1 → 100 - (1*100/5) = 80
+        List<BigDecimal> dist = List.of(
+                new BigDecimal("1.0"), new BigDecimal("0.8"), new BigDecimal("0.6"),
+                new BigDecimal("0.4"), new BigDecimal("0.2"));
+
+        int result = sabermetricsService.calculatePercentile(new BigDecimal("0.9"), dist, true);
+
+        assertThat(result).isEqualTo(80);
+    }
+
+    @Test
+    @DisplayName("낮을수록좋음_반전동작: [1.0~5.0] 중 1.5 → rank=1 → 백분위 80")
+    void calculatePercentile_낮을수록좋음_반전동작() {
+        // sorted asc: [1.0, 2.0, 3.0, 4.0, 5.0], target=1.5, higherIsBetter=false
+        // 1.5 > 1.0 → rank=1; 1.5 > 2.0 → false → break
+        // 100 - (1*100/5) = 80
+        List<BigDecimal> dist = List.of(
+                new BigDecimal("1.0"), new BigDecimal("2.0"), new BigDecimal("3.0"),
+                new BigDecimal("4.0"), new BigDecimal("5.0"));
+
+        int result = sabermetricsService.calculatePercentile(new BigDecimal("1.5"), dist, false);
+
+        assertThat(result).isEqualTo(80);
+    }
+
+    @Test
+    @DisplayName("빈 리스트이면 DEFAULT_PERCENTILE(50) 반환")
+    void calculatePercentile_빈리스트_50반환() {
+        int result = sabermetricsService.calculatePercentile(new BigDecimal("0.300"), List.of(), true);
+
+        assertThat(result).isEqualTo(50);
+    }
+
+    @Test
+    @DisplayName("target null이면 DEFAULT_PERCENTILE(50) 반환")
+    void calculatePercentile_null_50반환() {
+        List<BigDecimal> dist = List.of(new BigDecimal("0.300"), new BigDecimal("0.250"));
+
+        int result = sabermetricsService.calculatePercentile(null, dist, true);
+
+        assertThat(result).isEqualTo(50);
     }
 }

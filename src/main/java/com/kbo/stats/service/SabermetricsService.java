@@ -2,35 +2,40 @@ package com.kbo.stats.service;
 
 import com.kbo.stats.domain.BatterStats;
 import com.kbo.stats.domain.PitcherStats;
+import com.kbo.stats.domain.Player;
+import com.kbo.stats.domain.PlayerType;
 import com.kbo.stats.domain.StatValidationLog;
 import com.kbo.stats.dto.BatterLeagueTotalsDto;
 import com.kbo.stats.dto.LeagueTotalsDto;
 import com.kbo.stats.mapper.BatterStatsMapper;
 import com.kbo.stats.mapper.PitcherStatsMapper;
+import com.kbo.stats.mapper.PlayerMapper;
 import com.kbo.stats.mapper.StatValidationLogMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.cache.annotation.Cacheable;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class SabermetricsService {
 
-    // 비율 지표(OBP/SLG/OPS/ISO/BABIP/wOBA)는 소수 3자리
     private static final int SCALE_RATE  = 3;
-    // 비율 지표(K/9, BB/9, FIP 등)는 소수 2자리
     private static final int SCALE_RATIO = 2;
     private static final RoundingMode RM = RoundingMode.HALF_UP;
-
-    // 사이트값과 계산값 간 허용 오차 (0.001 이내 → 일치)
     private static final BigDecimal TOLERANCE = new BigDecimal("0.001");
+    private static final int DEFAULT_PERCENTILE = 50;
 
     // wOBA MLB 표준 가중치
     private static final BigDecimal W_BB  = new BigDecimal("0.69");
@@ -43,6 +48,10 @@ public class SabermetricsService {
     private final BatterStatsMapper batterStatsMapper;
     private final PitcherStatsMapper pitcherStatsMapper;
     private final StatValidationLogMapper statValidationLogMapper;
+    private final PlayerMapper playerMapper;
+
+    @Autowired @Lazy
+    private SabermetricsService self;
 
     // ──────────────────────────────────────────────────────────────
     // 타자 지표 계산
@@ -484,5 +493,148 @@ public class SabermetricsService {
         if (values.isEmpty()) return BigDecimal.ZERO;
         BigDecimal sum = values.stream().reduce(BigDecimal.ZERO, BigDecimal::add);
         return sum.divide(BigDecimal.valueOf(values.size()), scale, RM);
+    }
+
+    // ──────────────────────────────────────────────────────────────
+    // 백분위 계산 (0~100, 100이 최상위)
+    // ──────────────────────────────────────────────────────────────
+
+    /**
+     * 리그 내 순위 백분위: 정렬된 리스트에서 본인 등수 → (1 - rank/total) * 100
+     * higherIsBetter=false 이면 낮을수록 좋은 지표 (ERA, WHIP 등) — 정렬 반전
+     */
+    int calculatePercentile(BigDecimal target, List<BigDecimal> all, boolean higherIsBetter) {
+        if (target == null || all == null) return DEFAULT_PERCENTILE;
+        List<BigDecimal> sorted = all.stream()
+                .filter(Objects::nonNull)
+                .sorted(higherIsBetter ? Comparator.reverseOrder() : Comparator.naturalOrder())
+                .toList();
+        if (sorted.isEmpty()) return DEFAULT_PERCENTILE;
+        int rank = 0;
+        for (BigDecimal v : sorted) {
+            boolean isWorse = higherIsBetter ? target.compareTo(v) < 0 : target.compareTo(v) > 0;
+            if (!isWorse) break;
+            rank++;
+        }
+        return 100 - (rank * 100 / sorted.size());
+    }
+
+    // ── 리그 분포 리스트 (5분 캐시, self 참조로 AOP 프록시 경유) ──────
+
+    @Cacheable(value = "league_distributions", key = "'batterAvg'")
+    public List<BigDecimal> batterAvgDistribution() {
+        return playerMapper.findAllByPlayerType(PlayerType.BATTER).stream()
+                .map(p -> p.getBattingAvg() != null ? BigDecimal.valueOf(p.getBattingAvg()) : null)
+                .filter(Objects::nonNull)
+                .toList();
+    }
+
+    @Cacheable(value = "league_distributions", key = "'batterOps'")
+    public List<BigDecimal> batterOpsDistribution() {
+        return batterStatsMapper.findAll().stream()
+                .map(BatterStats::getOps).filter(Objects::nonNull).toList();
+    }
+
+    @Cacheable(value = "league_distributions", key = "'batterObp'")
+    public List<BigDecimal> batterObpDistribution() {
+        return batterStatsMapper.findAll().stream()
+                .map(BatterStats::getOnBasePct).filter(Objects::nonNull).toList();
+    }
+
+    @Cacheable(value = "league_distributions", key = "'batterIso'")
+    public List<BigDecimal> batterIsoDistribution() {
+        Map<Long, BigDecimal> avgByPlayer = playerMapper.findAllByPlayerType(PlayerType.BATTER).stream()
+                .filter(p -> p.getBattingAvg() != null)
+                .collect(Collectors.toMap(Player::getId, p -> BigDecimal.valueOf(p.getBattingAvg())));
+        return batterStatsMapper.findAll().stream()
+                .filter(s -> s.getSluggingPct() != null && avgByPlayer.containsKey(s.getPlayerId()))
+                .map(s -> s.getSluggingPct().subtract(avgByPlayer.get(s.getPlayerId())).setScale(SCALE_RATE, RM))
+                .toList();
+    }
+
+    @Cacheable(value = "league_distributions", key = "'batterBbk'")
+    public List<BigDecimal> batterBbkDistribution() {
+        return batterStatsMapper.findAll().stream()
+                .filter(s -> s.getWalks() != null && s.getStrikeouts() != null && s.getStrikeouts() > 0)
+                .map(s -> BigDecimal.valueOf(s.getWalks())
+                        .divide(BigDecimal.valueOf(s.getStrikeouts()), SCALE_RATE, RM))
+                .toList();
+    }
+
+    @Cacheable(value = "league_distributions", key = "'pitcherK9'")
+    public List<BigDecimal> pitcherK9Distribution() {
+        return pitcherStatsMapper.findAll().stream()
+                .map(this::calculateKper9).filter(Objects::nonNull).toList();
+    }
+
+    @Cacheable(value = "league_distributions", key = "'pitcherBb9'")
+    public List<BigDecimal> pitcherBb9Distribution() {
+        return pitcherStatsMapper.findAll().stream()
+                .map(this::calculateBBper9).filter(Objects::nonNull).toList();
+    }
+
+    @Cacheable(value = "league_distributions", key = "'pitcherOuts'")
+    public List<BigDecimal> pitcherOutsDistribution() {
+        return pitcherStatsMapper.findAll().stream()
+                .filter(s -> s.getInningsOuts() != null)
+                .map(s -> BigDecimal.valueOf(s.getInningsOuts()))
+                .toList();
+    }
+
+    @Cacheable(value = "league_distributions", key = "'pitcherWhip'")
+    public List<BigDecimal> pitcherWhipDistribution() {
+        return pitcherStatsMapper.findAll().stream()
+                .map(this::calculateWHIP).filter(Objects::nonNull).toList();
+    }
+
+    @Cacheable(value = "league_distributions", key = "'pitcherHr9'")
+    public List<BigDecimal> pitcherHr9Distribution() {
+        return pitcherStatsMapper.findAll().stream()
+                .map(this::calculateHRper9).filter(Objects::nonNull).toList();
+    }
+
+    // ── 타자 백분위 ──────────────────────────────────────────────────
+
+    public int getBatterPercentileAvg(BigDecimal avg) {
+        return calculatePercentile(avg, self.batterAvgDistribution(), true);
+    }
+
+    public int getBatterPercentileOps(BigDecimal ops) {
+        return calculatePercentile(ops, self.batterOpsDistribution(), true);
+    }
+
+    public int getBatterPercentileObp(BigDecimal obp) {
+        return calculatePercentile(obp, self.batterObpDistribution(), true);
+    }
+
+    public int getBatterPercentileIso(BigDecimal iso) {
+        return calculatePercentile(iso, self.batterIsoDistribution(), true);
+    }
+
+    public int getBatterPercentileBBperK(BigDecimal bbk) {
+        return calculatePercentile(bbk, self.batterBbkDistribution(), true);
+    }
+
+    // ── 투수 백분위 ──────────────────────────────────────────────────
+
+    public int getPitcherPercentileK9(BigDecimal k9) {
+        return calculatePercentile(k9, self.pitcherK9Distribution(), true);
+    }
+
+    public int getPitcherPercentileBB9(BigDecimal bb9) {
+        return calculatePercentile(bb9, self.pitcherBb9Distribution(), false);
+    }
+
+    public int getPitcherPercentileOuts(Integer outs) {
+        if (outs == null) return DEFAULT_PERCENTILE;
+        return calculatePercentile(BigDecimal.valueOf(outs), self.pitcherOutsDistribution(), true);
+    }
+
+    public int getPitcherPercentileWhip(BigDecimal whip) {
+        return calculatePercentile(whip, self.pitcherWhipDistribution(), false);
+    }
+
+    public int getPitcherPercentileHR9(BigDecimal hr9) {
+        return calculatePercentile(hr9, self.pitcherHr9Distribution(), false);
     }
 }

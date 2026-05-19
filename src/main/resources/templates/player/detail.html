@@ -3,9 +3,14 @@
       th:replace="~{layout/base :: base(
           title=${player.name},
           content=~{::main-content},
-          extraHead=~{},
-          extraScript=~{})}">
-<head><title>선수 상세</title></head>
+          extraHead=~{::extra-head},
+          extraScript=~{::extra-script})}">
+<head>
+    <title>선수 상세</title>
+    <th:block th:fragment="extra-head">
+        <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    </th:block>
+</head>
 <body>
 <th:block th:fragment="main-content">
 
@@ -118,7 +123,7 @@
         <div th:if="${player.pitcher}">
             <h5 class="mb-3"><i class="bi bi-bar-chart-fill text-danger"></i> 투수 기록</h5>
             <div class="row g-3">
-                <div class="col-6 col-md-4">
+                <div class="col-6 col-md-3">
                     <div class="card text-center h-100 border-danger">
                         <div class="card-body">
                             <div class="fs-1 fw-bold text-danger"
@@ -127,7 +132,7 @@
                         </div>
                     </div>
                 </div>
-                <div class="col-6 col-md-4">
+                <div class="col-6 col-md-3">
                     <div class="card text-center h-100">
                         <div class="card-body">
                             <div class="fs-1 fw-bold text-primary"
@@ -136,7 +141,7 @@
                         </div>
                     </div>
                 </div>
-                <div class="col-6 col-md-4">
+                <div class="col-6 col-md-3">
                     <div class="card text-center h-100">
                         <div class="card-body">
                             <div class="fs-1 fw-bold"
@@ -145,7 +150,7 @@
                         </div>
                     </div>
                 </div>
-                <div class="col-6 col-md-4">
+                <div class="col-6 col-md-3">
                     <div class="card text-center h-100">
                         <div class="card-body">
                             <div class="fs-1 fw-bold text-secondary"
@@ -153,6 +158,20 @@
                             <div class="text-muted small">홀드 (HLD)</div>
                         </div>
                     </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 레이더 차트 -->
+        <div class="card mt-3"
+             th:if="${(player.batter and batterStats != null) or (player.pitcher and pitcherStats != null)}">
+            <div class="card-body">
+                <h6 class="card-title mb-3">
+                    <i class="bi bi-activity"></i> 능력치 분석
+                    <span class="badge bg-secondary ms-2">리그 백분위</span>
+                </h6>
+                <div style="max-width: 450px; margin: 0 auto;">
+                    <canvas id="radarChart"></canvas>
                 </div>
             </div>
         </div>
@@ -578,5 +597,106 @@
 </div>
 
 </th:block>
+
+<th:block th:fragment="extra-script">
+
+<!-- 타자 레이더 차트 -->
+<th:block th:if="${player.batter and batterStats != null}">
+<script th:inline="javascript">
+    new Chart(document.getElementById('radarChart'), {
+        type: 'radar',
+        data: {
+            labels: ['정확성', '파워', '출루', '선구안', '종합'],
+            datasets: [{
+                label: /*[[${player.name}]]*/ 'PLAYER',
+                data: [
+                    /*[[${avgPercentile}]]*/ 50,
+                    /*[[${isoPercentile}]]*/ 50,
+                    /*[[${obpPercentile}]]*/ 50,
+                    /*[[${bbkPercentile}]]*/ 50,
+                    /*[[${opsPercentile}]]*/ 50
+                ],
+                backgroundColor: 'rgba(54, 162, 235, 0.3)',
+                borderColor: 'rgba(54, 162, 235, 1)',
+                borderWidth: 2,
+                pointBackgroundColor: 'rgba(54, 162, 235, 1)',
+                pointRadius: 4
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: true,
+            scales: {
+                r: {
+                    min: 0, max: 100,
+                    ticks: { stepSize: 25 },
+                    pointLabels: { font: { size: 13, weight: 'bold' } }
+                }
+            },
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    callbacks: {
+                        label: function(ctx) {
+                            return ctx.label + ': 상위 ' + (100 - ctx.parsed.r) + '%';
+                        }
+                    }
+                }
+            }
+        }
+    });
+</script>
+</th:block>
+
+<!-- 투수 레이더 차트 -->
+<th:block th:if="${player.pitcher and pitcherStats != null}">
+<script th:inline="javascript">
+    new Chart(document.getElementById('radarChart'), {
+        type: 'radar',
+        data: {
+            labels: ['탈삼진', '제구', '이닝 소화', '안정성', '피홈런 억제'],
+            datasets: [{
+                label: /*[[${player.name}]]*/ 'PLAYER',
+                data: [
+                    /*[[${k9Percentile}]]*/ 50,
+                    /*[[${bb9Percentile}]]*/ 50,
+                    /*[[${outsPercentile}]]*/ 50,
+                    /*[[${whipPercentile}]]*/ 50,
+                    /*[[${hr9Percentile}]]*/ 50
+                ],
+                backgroundColor: 'rgba(220, 53, 69, 0.3)',
+                borderColor: 'rgba(220, 53, 69, 1)',
+                borderWidth: 2,
+                pointBackgroundColor: 'rgba(220, 53, 69, 1)',
+                pointRadius: 4
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: true,
+            scales: {
+                r: {
+                    min: 0, max: 100,
+                    ticks: { stepSize: 25 },
+                    pointLabels: { font: { size: 13, weight: 'bold' } }
+                }
+            },
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    callbacks: {
+                        label: function(ctx) {
+                            return ctx.label + ': 상위 ' + (100 - ctx.parsed.r) + '%';
+                        }
+                    }
+                }
+            }
+        }
+    });
+</script>
+</th:block>
+
+</th:block>
+
 </body>
 </html>
