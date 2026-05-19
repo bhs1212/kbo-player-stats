@@ -1,5 +1,6 @@
 package com.kbo.stats.service;
 
+import java.util.List;
 import com.kbo.stats.domain.BatterStats;
 import com.kbo.stats.domain.PitcherStats;
 import com.kbo.stats.domain.StatValidationLog;
@@ -25,10 +26,14 @@ import static org.mockito.BDDMockito.*;
 @ExtendWith(MockitoExtension.class)
 class SabermetricsServiceTest {
 
-    @Mock private BatterStatsMapper batterStatsMapper;
-    @Mock private PitcherStatsMapper pitcherStatsMapper;
-    @Mock private StatValidationLogMapper statValidationLogMapper;
-    @Mock private PlayerMapper playerMapper;
+    @Mock
+    private BatterStatsMapper batterStatsMapper;
+    @Mock
+    private PitcherStatsMapper pitcherStatsMapper;
+    @Mock
+    private StatValidationLogMapper statValidationLogMapper;
+    @Mock
+    private PlayerMapper playerMapper;
 
     @InjectMocks
     private SabermetricsService sabermetricsService;
@@ -123,8 +128,8 @@ class SabermetricsServiceTest {
     void testFIP_리그상수적용() {
         // IP = 300 outs = 100이닝, HR=15, BB=40, HBP=5, SO=120
         // FIP = (13*15 + 3*(40+5) - 2*120) / 100 + 3.20
-        //     = (195 + 135 - 240) / 100 + 3.20
-        //     = 0.90 + 3.20 = 4.10
+        // = (195 + 135 - 240) / 100 + 3.20
+        // = 0.90 + 3.20 = 4.10
         PitcherStats stats = PitcherStats.builder()
                 .playerId(1L)
                 .inningsOuts(300)

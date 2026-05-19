@@ -173,6 +173,36 @@
                 <div style="max-width: 450px; margin: 0 auto;">
                     <canvas id="radarChart"></canvas>
                 </div>
+
+                <!-- 타자 범례 -->
+                <div th:if="${player.batter}"
+                     class="d-flex flex-wrap justify-content-center gap-3 mt-3 small text-muted">
+                    <span>정확성 <i class="bi bi-info-circle" data-bs-toggle="tooltip" data-bs-placement="top"
+                                    title="AVG (타율) - 안타 / 타수. 정확하게 안타를 만들어내는 능력"></i></span>
+                    <span>파워 <i class="bi bi-info-circle" data-bs-toggle="tooltip" data-bs-placement="top"
+                                  title="ISO (순수 장타력) - SLG - AVG. 장타로 보여주는 파워"></i></span>
+                    <span>출루 <i class="bi bi-info-circle" data-bs-toggle="tooltip" data-bs-placement="top"
+                                  title="OBP (출루율) - 안타+볼넷+사구 비율. 어떻게든 살아 나가는 능력"></i></span>
+                    <span>선구안 <i class="bi bi-info-circle" data-bs-toggle="tooltip" data-bs-placement="top"
+                                    title="BB/K - 볼넷 / 삼진. 공을 골라내는 눈"></i></span>
+                    <span>종합 <i class="bi bi-info-circle" data-bs-toggle="tooltip" data-bs-placement="top"
+                                  title="OPS - OBP + SLG. 타자 종합 능력의 표준 지표"></i></span>
+                </div>
+
+                <!-- 투수 범례 -->
+                <div th:if="${player.pitcher}"
+                     class="d-flex flex-wrap justify-content-center gap-3 mt-3 small text-muted">
+                    <span>탈삼진 <i class="bi bi-info-circle" data-bs-toggle="tooltip" data-bs-placement="top"
+                                    title="K/9 - 9이닝당 삼진 개수. 압도적 구위의 척도"></i></span>
+                    <span>제구 <i class="bi bi-info-circle" data-bs-toggle="tooltip" data-bs-placement="top"
+                                  title="BB/9 - 9이닝당 볼넷. 낮을수록 안정적인 제구 (반전)"></i></span>
+                    <span>이닝 소화 <i class="bi bi-info-circle" data-bs-toggle="tooltip" data-bs-placement="top"
+                                       title="IP - 총 투구 이닝. 팀 신뢰도와 내구성"></i></span>
+                    <span>안정성 <i class="bi bi-info-circle" data-bs-toggle="tooltip" data-bs-placement="top"
+                                    title="WHIP - 이닝당 출루 허용. 낮을수록 위기 적음 (반전)"></i></span>
+                    <span>피홈런 억제 <i class="bi bi-info-circle" data-bs-toggle="tooltip" data-bs-placement="top"
+                                          title="HR/9 - 9이닝당 피홈런. 낮을수록 좋음 (반전)"></i></span>
+                </div>
             </div>
         </div>
     </div>
@@ -603,6 +633,14 @@
 <!-- 타자 레이더 차트 -->
 <th:block th:if="${player.batter and batterStats != null}">
 <script th:inline="javascript">
+    const batterDescriptions = {
+        '정확성': 'AVG (타율) — 안타 / 타수. 정확하게 안타를 만들어내는 능력',
+        '파워':   'ISO (순수 장타력) — SLG - AVG. 장타로 보여주는 파워',
+        '출루':   'OBP (출루율) — 안타+볼넷+사구 비율. 어떻게든 살아 나가는 능력',
+        '선구안': 'BB/K (볼넷-삼진 비율) — 볼넷 / 삼진. 공을 골라내는 눈',
+        '종합':   'OPS — OBP + SLG. 타자 종합 능력의 표준 지표'
+    };
+
     new Chart(document.getElementById('radarChart'), {
         type: 'radar',
         data: {
@@ -636,10 +674,13 @@
             plugins: {
                 legend: { display: false },
                 tooltip: {
+                    titleFont: { size: 14, weight: 'bold' },
+                    bodyFont: { size: 12 },
+                    padding: 10,
                     callbacks: {
-                        label: function(ctx) {
-                            return ctx.label + ': 상위 ' + (100 - ctx.parsed.r) + '%';
-                        }
+                        title: function(ctx) { return ctx[0].label; },
+                        label: function(ctx) { return '상위 ' + (100 - ctx.parsed.r) + '%'; },
+                        afterLabel: function(ctx) { return batterDescriptions[ctx.label] || ''; }
                     }
                 }
             }
@@ -651,6 +692,14 @@
 <!-- 투수 레이더 차트 -->
 <th:block th:if="${player.pitcher and pitcherStats != null}">
 <script th:inline="javascript">
+    const pitcherDescriptions = {
+        '탈삼진':    'K/9 — 9이닝당 삼진 개수. 압도적 구위의 척도',
+        '제구':      'BB/9 — 9이닝당 볼넷. 낮을수록 안정적인 제구 (반전)',
+        '이닝 소화': 'IP — 총 투구 이닝. 팀 신뢰도와 내구성',
+        '안정성':    'WHIP — 이닝당 출루 허용. 낮을수록 위기 적음 (반전)',
+        '피홈런 억제': 'HR/9 — 9이닝당 피홈런. 낮을수록 좋음 (반전)'
+    };
+
     new Chart(document.getElementById('radarChart'), {
         type: 'radar',
         data: {
@@ -684,10 +733,13 @@
             plugins: {
                 legend: { display: false },
                 tooltip: {
+                    titleFont: { size: 14, weight: 'bold' },
+                    bodyFont: { size: 12 },
+                    padding: 10,
                     callbacks: {
-                        label: function(ctx) {
-                            return ctx.label + ': 상위 ' + (100 - ctx.parsed.r) + '%';
-                        }
+                        title: function(ctx) { return ctx[0].label; },
+                        label: function(ctx) { return '상위 ' + (100 - ctx.parsed.r) + '%'; },
+                        afterLabel: function(ctx) { return pitcherDescriptions[ctx.label] || ''; }
                     }
                 }
             }
@@ -695,6 +747,14 @@
     });
 </script>
 </th:block>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        document.querySelectorAll('[data-bs-toggle="tooltip"]').forEach(function (el) {
+            new bootstrap.Tooltip(el);
+        });
+    });
+</script>
 
 </th:block>
 
