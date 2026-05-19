@@ -46,8 +46,8 @@
 /* ── 커스텀 게임 행 ── */
 .game-row {
   display: grid;
-  grid-template-columns: 38px 18px 18px 38px;
-  gap: 4px;
+  grid-template-columns: 38px 44px 38px;
+  gap: 6px;
   align-items: center;
   font-size: 11px;
   line-height: 1.4;
@@ -63,16 +63,22 @@
   white-space: nowrap;
   text-overflow: ellipsis;
 }
-.score-winner { color: #E24B4A; font-weight: 500; text-align: right; }
-.score-loser  { color: #888; text-align: left; }
-.score-tie    { color: #333; }
-.score-tie-l  { text-align: right; }
-.score-tie-r  { text-align: left; }
-.game-row .stadium {
+.score-block {
+  text-align: center;
+  font-size: 11px;
+  white-space: nowrap;
+}
+.score-block .colon {
+  color: #aaa;
+  margin: 0 1px;
+}
+.score-winner-text { color: #E24B4A; font-weight: 500; }
+.score-loser-text  { color: #888; }
+.score-tie-text    { color: #333; }
+.game-row .center-text {
   font-size: 10px;
   color: #666;
   text-align: center;
-  grid-column: 2 / 4;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -327,34 +333,43 @@
             if (as === hs) {
                 awayBadge  = teamBadgeHtml(p.awayTeam, 'background:' + aC + ';color:#fff;');
                 homeBadge  = teamBadgeHtml(p.homeTeam, 'background:' + hC + ';color:#fff;');
-                middleHtml = '<div class="score-tie score-tie-l">' + as + '</div>' +
-                             '<div class="score-tie score-tie-r">' + hs + '</div>';
+                middleHtml = '<div class="score-block">' +
+                             '<span class="score-tie-text">' + as + '</span>' +
+                             '<span class="colon">:</span>' +
+                             '<span class="score-tie-text">' + hs + '</span>' +
+                             '</div>';
             } else if (as > hs) {
                 awayBadge  = teamBadgeHtml(p.awayTeam, 'background:' + aC + ';color:#fff;');
                 homeBadge  = teamBadgeHtml(p.homeTeam, 'background:#fff;color:' + hC + ';border:1px solid ' + hC + ';opacity:0.6;');
-                middleHtml = '<div class="score-winner">' + as + '</div>' +
-                             '<div class="score-loser">'  + hs + '</div>';
+                middleHtml = '<div class="score-block">' +
+                             '<span class="score-winner-text">' + as + '</span>' +
+                             '<span class="colon">:</span>' +
+                             '<span class="score-loser-text">'  + hs + '</span>' +
+                             '</div>';
             } else {
                 awayBadge  = teamBadgeHtml(p.awayTeam, 'background:#fff;color:' + aC + ';border:1px solid ' + aC + ';opacity:0.6;');
                 homeBadge  = teamBadgeHtml(p.homeTeam, 'background:' + hC + ';color:#fff;');
-                middleHtml = '<div class="score-loser">'  + as + '</div>' +
-                             '<div class="score-winner">' + hs + '</div>';
+                middleHtml = '<div class="score-block">' +
+                             '<span class="score-loser-text">'  + as + '</span>' +
+                             '<span class="colon">:</span>' +
+                             '<span class="score-winner-text">' + hs + '</span>' +
+                             '</div>';
             }
         } else if (p.status === 'CANCELED') {
             awayBadge  = teamBadgeHtml(p.awayTeam, 'background:#fff;color:' + aC + ';border:1px solid ' + aC + ';');
             homeBadge  = teamBadgeHtml(p.homeTeam, 'background:#fff;color:' + hC + ';border:1px solid ' + hC + ';');
-            middleHtml = '<div class="stadium">취소</div>';
+            middleHtml = '<div class="center-text">취소</div>';
         } else if (p.status === 'POSTPONED') {
             awayBadge  = teamBadgeHtml(p.awayTeam, 'background:#fff;color:' + aC + ';border:1px solid ' + aC + ';');
             homeBadge  = teamBadgeHtml(p.homeTeam, 'background:#fff;color:' + hC + ';border:1px solid ' + hC + ';');
-            middleHtml = '<div class="stadium">연기</div>';
+            middleHtml = '<div class="center-text">연기</div>';
         } else {
             /* SCHEDULED / IN_PROGRESS */
             awayBadge  = teamBadgeHtml(p.awayTeam, 'background:#fff;color:' + aC + ';border:1px solid ' + aC + ';');
             homeBadge  = teamBadgeHtml(p.homeTeam, 'background:#fff;color:' + hC + ';border:1px solid ' + hC + ';');
             var label  = (p.stadium && p.stadium !== '-') ? p.stadium
                        : (p.gameTime ? p.gameTime.substring(0, 5) : '');
-            middleHtml = '<div class="stadium">' + label + '</div>';
+            middleHtml = '<div class="center-text">' + label + '</div>';
         }
 
         return '<div class="game-row">' + awayBadge + middleHtml + homeBadge + '</div>';
