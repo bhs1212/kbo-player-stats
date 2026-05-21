@@ -14,6 +14,7 @@ import com.kbo.stats.external.kbo.parser.KboResponseParser;
 import com.kbo.stats.mapper.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -22,20 +23,23 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class BoxScoreCollectService {
 
-    private final GameMapper           gameMapper;
-    private final GameBoxScoreMapper   boxScoreMapper;
+    private final GameMapper gameMapper;
+    private final GameBoxScoreMapper boxScoreMapper;
     private final GameInningScoreMapper inningScoreMapper;
-    private final GameEventMapper      eventMapper;
-    private final GameBatterLogMapper  batterLogMapper;
+    private final GameEventMapper eventMapper;
+    private final GameBatterLogMapper batterLogMapper;
     private final GamePitcherLogMapper pitcherLogMapper;
     private final KboBoxScoreApiClient apiClient;
-    private final KboResponseParser    parser;
-    private final ObjectMapper         objectMapper;
+    private final KboResponseParser parser;
+    private final ObjectMapper objectMapper;
 
     /**
      * 단일 게임 박스스코어 수집 + DB 영속.
-     * <p>FINISHED 아닌 경기는 SKIPPED, API 실패는 FAILED, DB 실패는 예외 전파(트랜잭션 롤백).</p>
+     * <p>
+     * FINISHED 아닌 경기는 SKIPPED, API 실패는 FAILED, DB 실패는 예외 전파(트랜잭션 롤백).
+     * </p>
      */
+    @CacheEvict(value = "gameDetail", key = "#gameId")
     @Transactional
     public BoxScoreCollectResult collectOne(Long gameId) {
         // 1. 게임 조회
@@ -58,13 +62,13 @@ public class BoxScoreCollectService {
 
         // 4. API 호출 — 실패 시 FAILED 반환 (트랜잭션은 kboGameId update만 포함하여 커밋)
         KboScoreBoardResponse sb;
-        KboBoxScoreResponse   bs;
+        KboBoxScoreResponse bs;
         try {
             int seasonId = game.getGameDate().getYear();
             sb = apiClient.fetchScoreBoard(seasonId, kboGameId);
             bs = apiClient.fetchBoxScore(seasonId, kboGameId);
         } catch (Exception e) {
-            log.error("[박스스코어] API 실패 gameId={} kboGameId={}: {}", gameId, kboGameId, e.getMessage());
+            log.error("[박스스코어] API 실패 gameId={} kboGameId={}: {}", gameId, kboGameId, e.getMessage(), e);
             return BoxScoreCollectResult.failed(gameId, kboGameId, e.getMessage());
         }
 
@@ -128,12 +132,16 @@ public class BoxScoreCollectService {
         }
 
         // game_batter_log (AWAY + HOME)
-        for (ParsedBatterLine b : parsed.getAwayBatters()) insertBatter(gameId, b);
-        for (ParsedBatterLine b : parsed.getHomeBatters())  insertBatter(gameId, b);
+        for (ParsedBatterLine b : parsed.getAwayBatters())
+            insertBatter(gameId, b);
+        for (ParsedBatterLine b : parsed.getHomeBatters())
+            insertBatter(gameId, b);
 
         // game_pitcher_log (AWAY + HOME)
-        for (ParsedPitcherLine p : parsed.getAwayPitchers()) insertPitcher(gameId, p);
-        for (ParsedPitcherLine p : parsed.getHomePitchers())  insertPitcher(gameId, p);
+        for (ParsedPitcherLine p : parsed.getAwayPitchers())
+            insertPitcher(gameId, p);
+        for (ParsedPitcherLine p : parsed.getHomePitchers())
+            insertPitcher(gameId, p);
     }
 
     private void insertBatter(Long gameId, ParsedBatterLine b) {

@@ -40,4 +40,34 @@
         ORDER BY team_side, batting_order
     </select>
 
+    <select id="findAllByGameId" resultMap="GameBatterLogResultMap">
+        SELECT * FROM game_batter_log
+        WHERE game_id = #{gameId}
+        ORDER BY team_side ASC, batting_order ASC
+    </select>
+
+    <resultMap id="BatterBoxScoreAggregateResultMap" type="com.kbo.stats.dto.BatterBoxScoreAggregate">
+        <result property="playerId"    column="player_id"/>
+        <result property="totalAtBats" column="total_at_bats"/>
+        <result property="totalHits"   column="total_hits"/>
+        <result property="gameCount"   column="game_count"/>
+    </resultMap>
+
+    <select id="aggregateByPlayerId" resultMap="BatterBoxScoreAggregateResultMap">
+        SELECT
+            p.id                          AS player_id,
+            COALESCE(SUM(bl.at_bats), 0) AS total_at_bats,
+            COALESCE(SUM(bl.hits), 0)    AS total_hits,
+            COUNT(DISTINCT bl.game_id)   AS game_count
+        FROM player p
+        JOIN game_batter_log bl ON bl.player_name = p.name
+        JOIN game g ON g.id = bl.game_id
+            AND (
+                (bl.team_side = 'AWAY' AND g.away_team = p.team)
+                OR (bl.team_side = 'HOME' AND g.home_team = p.team)
+            )
+        WHERE p.id = #{playerId}
+        GROUP BY p.id
+    </select>
+
 </mapper>

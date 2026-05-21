@@ -2,12 +2,15 @@ package com.kbo.stats.controller.api;
 
 import com.kbo.stats.domain.Game;
 import com.kbo.stats.dto.ApiResponse;
+import com.kbo.stats.dto.GameDetailDto;
+import com.kbo.stats.service.GameDetailService;
 import com.kbo.stats.service.GameService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
@@ -20,6 +23,7 @@ import java.util.List;
 public class GameApiController {
 
     private final GameService gameService;
+    private final GameDetailService gameDetailService;
 
     @Operation(summary = "기간별 경기 조회", description = "from~to 기간의 경기 목록을 반환합니다.")
     @GetMapping
@@ -39,5 +43,16 @@ public class GameApiController {
     public ApiResponse<Game> get(
             @Parameter(description = "경기 ID") @PathVariable Long id) {
         return ApiResponse.ok(gameService.getGameById(id));
+    }
+
+    @Operation(summary = "경기 박스스코어 상세 조회", description = "ID로 경기 박스스코어 전체 정보를 반환합니다.")
+    @GetMapping("/{id}/detail")
+    public ResponseEntity<GameDetailDto> getDetail(
+            @Parameter(description = "경기 ID") @PathVariable Long id) {
+        try {
+            return ResponseEntity.ok(gameDetailService.findGameDetail(id));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.notFound().build();
+        }
     }
 }

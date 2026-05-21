@@ -1,9 +1,12 @@
 package com.kbo.stats.controller;
 
 import com.kbo.stats.domain.Game;
+import com.kbo.stats.domain.GameInningScore;
 import com.kbo.stats.domain.UserAccount;
 import com.kbo.stats.dto.CalendarEventDto;
+import com.kbo.stats.dto.GameDetailDto;
 import com.kbo.stats.service.GameCrawler;
+import com.kbo.stats.service.GameDetailService;
 import com.kbo.stats.service.GameService;
 import com.kbo.stats.service.UserAccountService;
 import io.swagger.v3.oas.annotations.Hidden;
@@ -21,10 +24,13 @@ import java.time.YearMonth;
 import java.time.format.DateTimeFormatter;
 import java.time.format.TextStyle;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 
 @Hidden
 @Controller
@@ -35,6 +41,7 @@ public class GameController {
     private final GameService gameService;
     private final GameCrawler gameCrawler;
     private final UserAccountService userAccountService;
+    private final GameDetailService gameDetailService;
 
     private static final List<String> KBO_TEAMS = List.of(
             "두산", "LG", "SSG", "키움", "삼성", "KT", "롯데", "한화", "NC", "KIA");
@@ -120,12 +127,52 @@ public class GameController {
         return gameService.findEventsForCalendar(s, e, team);
     }
 
+    private static final Map<String, String> TEAM_HEX = Map.ofEntries(
+        Map.entry("KIA",  "#EA002C"), Map.entry("KT",  "#000000"),
+        Map.entry("LG",   "#C30452"), Map.entry("NC",  "#1D5288"),
+        Map.entry("SSG",  "#CE0E2D"), Map.entry("두산", "#131230"),
+        Map.entry("롯데", "#002955"), Map.entry("삼성", "#074CA1"),
+        Map.entry("키움", "#570514"), Map.entry("한화", "#FF6600")
+    );
+
     /** 경기 상세 */
     @GetMapping("/{id}")
     public String detail(@PathVariable Long id, Model model) {
-        Game game = gameService.getGameById(id);
-        model.addAttribute("game", game);
+        GameDetailDto detail;
+        try {
+            detail = gameDetailService.findGameDetail(id);
+        } catch (IllegalArgumentException e) {
+            return "error/404";
+        }
+        model.addAttribute("detail", detail);
+
+        if (detail.isHasBoxScore()) {
+            // null score 이닝(연장 미사용 placeholder)은 제외하고 실제 최대 이닝 산출
+            int maxInning = detail.getInnings().stream()
+                .filter(i -> i.getScore() != null)
+                .mapToInt(GameInningScore::getInning).max().orElse(9);
+            maxInning = Math.max(maxInning, 9);
+
+            model.addAttribute("maxInning", maxInning);
+            model.addAttribute("awayInningScores", buildInningScores(detail.getInnings(), "AWAY", maxInning));
+            model.addAttribute("homeInningScores", buildInningScores(detail.getInnings(), "HOME", maxInning));
+        }
+
+        model.addAttribute("awayTeamColor", TEAM_HEX.getOrDefault(detail.getGame().getAwayTeam(), "#666666"));
+        model.addAttribute("homeTeamColor", TEAM_HEX.getOrDefault(detail.getGame().getHomeTeam(), "#666666"));
+
         return "game/detail";
+    }
+
+    private List<Integer> buildInningScores(List<GameInningScore> innings, String side, int maxInning) {
+        // Collectors.toMap은 null 값 불허 → HashMap으로 직접 수집
+        Map<Integer, Integer> map = new HashMap<>();
+        innings.stream()
+            .filter(i -> side.equals(i.getTeamSide()))
+            .forEach(i -> map.put(i.getInning(), i.getScore()));
+        return IntStream.rangeClosed(1, maxInning)
+            .mapToObj(map::get)
+            .collect(Collectors.toList());
     }
 
     /** ADMIN 전용: 시즌 전체(3~11월) 크롤링 */

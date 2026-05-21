@@ -28,4 +28,10 @@
         ORDER BY team_side, inning
     </select>
 
+    <select id="findAllByGameId" resultMap="GameInningScoreResultMap">
+        SELECT * FROM game_inning_score
+        WHERE game_id = #{gameId}
+        ORDER BY inning ASC, team_side ASC
+    </select>
+
 </mapper>

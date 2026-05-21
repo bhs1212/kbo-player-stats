@@ -34,4 +34,10 @@
         ORDER BY event_type, inning
     </select>
 
+    <select id="findAllByGameId" resultMap="GameEventResultMap">
+        SELECT * FROM game_event
+        WHERE game_id = #{gameId}
+        ORDER BY id ASC
+    </select>
+
 </mapper>

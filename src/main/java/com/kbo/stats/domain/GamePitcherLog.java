@@ -35,4 +35,10 @@ public class GamePitcherLog {
     private int           earnedRuns;
     private BigDecimal    seasonEra;
     private LocalDateTime createdAt;
+
+    public String getInningsPitchedDisplay() {
+        int whole = inningsPitchedOuts / 3;
+        int rem   = inningsPitchedOuts % 3;
+        return whole + (rem == 1 ? "⅓" : rem == 2 ? "⅔" : "");
+    }
 }

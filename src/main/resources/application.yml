@@ -13,7 +13,7 @@ spring:
 
   cache:
     type: caffeine
-    cache-names: leagueStats
+    cache-names: leagueStats,gameDetail
     caffeine:
       spec: expireAfterWrite=300s,maximumSize=100
 
@@ -53,8 +53,8 @@ admin:
 
 kbo:
   api:
-    scoreboard-url: ${KBO_SCOREBOARD_URL:https://m.sports.naver.com/api/kbo/game/scoreboard}
-    boxscore-url:   ${KBO_BOXSCORE_URL:https://m.sports.naver.com/api/kbo/game/boxscore}
+    scoreboard-url: ${KBO_SCOREBOARD_URL:https://www.koreabaseball.com/ws/Schedule.asmx/GetScoreBoardScroll}
+    boxscore-url: ${KBO_BOXSCORE_URL:https://www.koreabaseball.com/ws/Schedule.asmx/GetBoxScoreScroll}
 
 springdoc:
   api-docs:

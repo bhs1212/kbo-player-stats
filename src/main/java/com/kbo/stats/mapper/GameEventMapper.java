@@ -11,4 +11,5 @@ public interface GameEventMapper {
     void insert(GameEvent e);
     int deleteByGameId(@Param("gameId") Long gameId);
     List<GameEvent> findByGameId(@Param("gameId") Long gameId);
+    List<GameEvent> findAllByGameId(@Param("gameId") Long gameId);
 }

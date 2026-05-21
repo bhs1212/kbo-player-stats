@@ -1,83 +1,424 @@
 <!DOCTYPE html>
 <html lang="ko" xmlns:th="http://www.thymeleaf.org"
       th:replace="~{layout/base :: base(
-          title='경기 상세',
+          title=|${detail.game.awayTeam} vs ${detail.game.homeTeam} - ${#temporals.format(detail.game.gameDate, 'yyyy-MM-dd')}|,
           content=~{::main-content},
-          extraHead=~{},
+          extraHead=~{::detail-css},
           extraScript=~{})}">
 <head><title>경기 상세</title></head>
 <body>
+
+<th:block th:fragment="detail-css">
+<style>
+.team-dot {
+    display: inline-block;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    vertical-align: middle;
+    margin-right: 4px;
+}
+.score-display {
+    font-size: 3rem;
+    font-weight: 700;
+    line-height: 1.1;
+    letter-spacing: -1px;
+}
+.scoreboard-table th,
+.scoreboard-table td {
+    text-align: center;
+    padding: 0.4rem 0.6rem;
+    white-space: nowrap;
+}
+.scoreboard-table .team-name-cell {
+    text-align: left;
+    font-weight: 600;
+    min-width: 56px;
+}
+.result-W { color: #0d6efd; font-weight: 700; }
+.result-L { color: #dc3545; font-weight: 700; }
+.result-S { color: #198754; font-weight: 700; }
+</style>
+</th:block>
+
 <th:block th:fragment="main-content">
 
+<!-- 뒤로가기 -->
 <div class="d-flex align-items-center mb-3">
     <a th:href="@{/games}" class="btn btn-outline-secondary btn-sm me-2">
         <i class="bi bi-arrow-left"></i> 목록으로
     </a>
-    <h4 class="mb-0">
-        <i class="bi bi-calendar-event text-primary"></i> 경기 상세
-    </h4>
+    <h5 class="mb-0 text-muted small">
+        <span th:text="${detail.game.awayTeam}"></span>
+        vs
+        <span th:text="${detail.game.homeTeam}"></span>
+    </h5>
 </div>
 
-<div class="card shadow-sm" th:if="${game != null}">
+<!-- ── A. 헤더 카드 ── -->
+<div class="card shadow-sm mb-4">
     <div class="card-body p-4">
-        <div class="text-center mb-4">
-            <!-- 날짜·경기장 -->
-            <p class="text-muted mb-1">
-                <span th:text="${#temporals.format(game.gameDate, 'yyyy년 M월 d일')}"></span>
-                <span th:if="${game.gameTime != null}"
-                      th:text="' ' + ${#temporals.format(game.gameTime, 'HH:mm')}"></span>
-                <span th:if="${game.stadium != null and !#strings.isEmpty(game.stadium)}"
-                      th:text="' · ' + ${game.stadium}" class="text-muted"></span>
-            </p>
-            <!-- 상태 -->
-            <span th:switch="${game.status.name()}">
-                <span th:case="'SCHEDULED'"   class="badge bg-primary fs-6">예정</span>
-                <span th:case="'IN_PROGRESS'" class="badge bg-warning text-dark fs-6">진행중</span>
-                <span th:case="'FINISHED'"    class="badge bg-success fs-6">종료</span>
-                <span th:case="'POSTPONED'"   class="badge bg-secondary fs-6">연기</span>
-                <span th:case="'CANCELED'"    class="badge bg-danger fs-6">취소</span>
-            </span>
+        <div class="row text-center align-items-center g-0">
+
+            <!-- AWAY 팀 -->
+            <div class="col-5 text-end pe-3">
+                <div class="fs-3 fw-bold">
+                    <span class="team-dot" th:style="'background-color:' + ${awayTeamColor}"></span>
+                    <span th:text="${detail.game.awayTeam}">원정팀</span>
+                </div>
+                <div th:if="${detail.hasBoxScore}" class="small text-muted mt-1">
+                    <span th:text="${detail.boxScore.awaySeasonW}">0</span>승
+                    <span th:text="${detail.boxScore.awaySeasonL}">0</span>패
+                    <span th:text="${detail.boxScore.awaySeasonD}">0</span>무
+                </div>
+                <small class="text-muted">원정</small>
+            </div>
+
+            <!-- 스코어 / 상태 -->
+            <div class="col-2">
+                <div th:if="${detail.hasBoxScore}" class="score-display">
+                    <span th:classappend="${detail.game.awayWin} ? '' : 'text-muted'"
+                          th:text="${detail.game.awayScore}">0</span>
+                    <span class="text-muted fw-light fs-3 mx-1">:</span>
+                    <span th:classappend="${detail.game.homeWin} ? '' : 'text-muted'"
+                          th:text="${detail.game.homeScore}">0</span>
+                </div>
+                <div th:unless="${detail.hasBoxScore}" class="fs-2 fw-light text-muted">vs</div>
+                <div class="mt-2">
+                    <span th:switch="${detail.game.status.name()}">
+                        <span th:case="'SCHEDULED'"   class="badge bg-primary">예정</span>
+                        <span th:case="'IN_PROGRESS'" class="badge bg-warning text-dark">진행중</span>
+                        <span th:case="'FINISHED'"    class="badge bg-success">경기 종료</span>
+                        <span th:case="'POSTPONED'"   class="badge bg-secondary">연기</span>
+                        <span th:case="'CANCELED'"    class="badge bg-danger">취소</span>
+                    </span>
+                </div>
+            </div>
+
+            <!-- HOME 팀 -->
+            <div class="col-5 text-start ps-3">
+                <div class="fs-3 fw-bold">
+                    <span class="team-dot" th:style="'background-color:' + ${homeTeamColor}"></span>
+                    <span th:text="${detail.game.homeTeam}">홈팀</span>
+                </div>
+                <div th:if="${detail.hasBoxScore}" class="small text-muted mt-1">
+                    <span th:text="${detail.boxScore.homeSeasonW}">0</span>승
+                    <span th:text="${detail.boxScore.homeSeasonL}">0</span>패
+                    <span th:text="${detail.boxScore.homeSeasonD}">0</span>무
+                </div>
+                <small class="text-muted">홈</small>
+            </div>
         </div>
 
-        <!-- 스코어 보드 -->
-        <div class="row text-center align-items-center">
-            <div class="col-4">
-                <div class="display-6 fw-bold"
-                     th:classappend="${game.awayWin} ? 'text-success'"
-                     th:text="${game.awayTeam}"></div>
-                <small class="text-muted">원정</small>
-                <div th:if="${game.status.name() == 'FINISHED'}"
-                     class="display-5 fw-bold mt-2"
-                     th:classappend="${game.awayWin} ? 'text-success' : 'text-muted'"
-                     th:text="${game.awayScore}"></div>
-            </div>
-            <div class="col-4">
-                <div class="fs-3 text-muted fw-light"
-                     th:text="${game.status.name() == 'FINISHED'} ? ':' : 'VS'"></div>
-            </div>
-            <div class="col-4">
-                <div class="display-6 fw-bold"
-                     th:classappend="${game.homeWin} ? 'text-success'"
-                     th:text="${game.homeTeam}"></div>
-                <small class="text-muted">홈</small>
-                <div th:if="${game.status.name() == 'FINISHED'}"
-                     class="display-5 fw-bold mt-2"
-                     th:classappend="${game.homeWin} ? 'text-success' : 'text-muted'"
-                     th:text="${game.homeScore}"></div>
-            </div>
+        <!-- 날짜 · 시간 · 경기장 -->
+        <div class="text-center mt-3 text-muted small">
+            <i class="bi bi-calendar3 me-1"></i>
+            <span th:text="${#temporals.format(detail.game.gameDate, 'yyyy년 M월 d일')}"></span>
+            <span th:if="${detail.game.gameTime != null}"
+                  th:text="' ' + ${#temporals.format(detail.game.gameTime, 'HH:mm')}"></span>
+            <span th:if="${detail.game.stadium != null and !#strings.isEmpty(detail.game.stadium)}"
+                  th:text="' · ' + ${detail.game.stadium}"></span>
         </div>
 
         <!-- 비고 -->
-        <div th:if="${game.notes != null and !#strings.isEmpty(game.notes)}"
-             class="alert alert-secondary mt-4 mb-0">
+        <div th:if="${detail.game.notes != null and !#strings.isEmpty(detail.game.notes)}"
+             class="alert alert-secondary mt-3 mb-0 py-2 small">
             <i class="bi bi-info-circle me-1"></i>
-            <span th:text="${game.notes}"></span>
+            <span th:text="${detail.game.notes}"></span>
         </div>
     </div>
 </div>
 
-<!-- Stage 3에서 확장 예정: 경기 기록, 선발 투수, 타순 정보 -->
+<!-- ── G. 박스스코어 없음 안내 ── -->
+<div th:unless="${detail.hasBoxScore}" class="card shadow-sm mb-4">
+    <div class="card-body text-center py-5">
+        <i class="bi bi-clock fs-1 text-muted d-block mb-3"></i>
+        <h5 class="text-muted">경기 종료 후 박스스코어가 제공됩니다</h5>
+        <p class="small text-muted mb-0">경기가 완료되면 이닝별 스코어·타자·투수 기록을 확인하실 수 있습니다.</p>
+    </div>
+</div>
 
-</th:block>
+<!-- ── 박스스코어 영역 (hasBoxScore=true) ── -->
+<th:block th:if="${detail.hasBoxScore}">
+
+<!-- B. 이닝별 스코어보드 -->
+<div class="card shadow-sm mb-4">
+    <div class="card-header fw-semibold">
+        <i class="bi bi-table me-1"></i> 이닝별 스코어
+    </div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-bordered table-sm mb-0 scoreboard-table">
+                <thead class="table-light">
+                    <tr>
+                        <th class="team-name-cell">팀</th>
+                        <th th:each="i : ${#numbers.sequence(1, maxInning)}"
+                            th:text="${i}">1</th>
+                        <th class="fw-bold">R</th>
+                        <th class="fw-bold">H</th>
+                        <th class="fw-bold">E</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td class="team-name-cell" th:text="${detail.game.awayTeam}"></td>
+                        <td th:each="score : ${awayInningScores}"
+                            th:text="${score != null ? score : '-'}">-</td>
+                        <td class="fw-bold" th:text="${detail.game.awayScore}"></td>
+                        <td class="fw-bold" th:text="${detail.boxScore.awayHits}"></td>
+                        <td class="fw-bold" th:text="${detail.boxScore.awayErrors}"></td>
+                    </tr>
+                    <tr>
+                        <td class="team-name-cell" th:text="${detail.game.homeTeam}"></td>
+                        <td th:each="score : ${homeInningScores}"
+                            th:text="${score != null ? score : '-'}">-</td>
+                        <td class="fw-bold" th:text="${detail.game.homeScore}"></td>
+                        <td class="fw-bold" th:text="${detail.boxScore.homeHits}"></td>
+                        <td class="fw-bold" th:text="${detail.boxScore.homeErrors}"></td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- C. 주요 이벤트 -->
+<div th:if="${!detail.events.isEmpty()}" class="card shadow-sm mb-4">
+    <div class="card-header fw-semibold">
+        <i class="bi bi-lightning-charge-fill text-warning me-1"></i> 주요 이벤트
+    </div>
+    <div class="card-body">
+        <ul class="list-unstyled mb-0">
+            <li th:each="event : ${detail.events}" class="d-flex align-items-start mb-2">
+                <span class="badge bg-secondary me-2 mt-1 flex-shrink-0"
+                      th:text="${event.inning != null ? event.inning + '회' : '-'}"></span>
+                <div>
+                    <span class="fw-semibold" th:text="${event.eventType}"></span>
+                    <span th:if="${event.playerName != null and !#strings.isEmpty(event.playerName)}"
+                          class="ms-1" th:text="'- ' + ${event.playerName}"></span>
+                    <span th:if="${event.rawText != null and !#strings.isEmpty(event.rawText)}"
+                          class="text-muted small ms-1"
+                          th:text="'(' + ${event.rawText} + ')'"></span>
+                </div>
+            </li>
+        </ul>
+    </div>
+</div>
+
+<!-- D. 타자 박스스코어 -->
+<div th:if="${!detail.awayBatters.isEmpty()}" class="card shadow-sm mb-3">
+    <div class="card-header fw-semibold">
+        <i class="bi bi-person-fill me-1"></i>
+        <span th:text="${detail.game.awayTeam}"></span> 타자
+    </div>
+    <div class="table-responsive">
+        <table class="table table-sm table-hover mb-0">
+            <thead class="table-light">
+                <tr>
+                    <th>타순</th>
+                    <th>포지션</th>
+                    <th>선수명</th>
+                    <th class="text-center">타수</th>
+                    <th class="text-center">안타</th>
+                    <th class="text-center">타점</th>
+                    <th class="text-center">볼넷</th>
+                    <th class="text-center">시즌타율</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr th:each="batter : ${detail.awayBatters}">
+                    <td th:text="${batter.battingOrder}"></td>
+                    <td th:text="${batter.position}"></td>
+                    <td th:text="${batter.playerName}"></td>
+                    <td class="text-center" th:text="${batter.atBats}"></td>
+                    <td class="text-center" th:text="${batter.hits}"></td>
+                    <td class="text-center" th:text="${batter.rbi}"></td>
+                    <td class="text-center" th:text="${batter.walks}"></td>
+                    <td class="text-center" th:text="${batter.seasonAvg}"></td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<div th:if="${!detail.homeBatters.isEmpty()}" class="card shadow-sm mb-4">
+    <div class="card-header fw-semibold">
+        <i class="bi bi-person-fill me-1"></i>
+        <span th:text="${detail.game.homeTeam}"></span> 타자
+    </div>
+    <div class="table-responsive">
+        <table class="table table-sm table-hover mb-0">
+            <thead class="table-light">
+                <tr>
+                    <th>타순</th>
+                    <th>포지션</th>
+                    <th>선수명</th>
+                    <th class="text-center">타수</th>
+                    <th class="text-center">안타</th>
+                    <th class="text-center">타점</th>
+                    <th class="text-center">볼넷</th>
+                    <th class="text-center">시즌타율</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr th:each="batter : ${detail.homeBatters}">
+                    <td th:text="${batter.battingOrder}"></td>
+                    <td th:text="${batter.position}"></td>
+                    <td th:text="${batter.playerName}"></td>
+                    <td class="text-center" th:text="${batter.atBats}"></td>
+                    <td class="text-center" th:text="${batter.hits}"></td>
+                    <td class="text-center" th:text="${batter.rbi}"></td>
+                    <td class="text-center" th:text="${batter.walks}"></td>
+                    <td class="text-center" th:text="${batter.seasonAvg}"></td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- E. 투수 박스스코어 -->
+<div th:if="${!detail.awayPitchers.isEmpty()}" class="card shadow-sm mb-3">
+    <div class="card-header fw-semibold">
+        <i class="bi bi-person-arms-up me-1"></i>
+        <span th:text="${detail.game.awayTeam}"></span> 투수
+    </div>
+    <div class="table-responsive">
+        <table class="table table-sm table-hover mb-0">
+            <thead class="table-light">
+                <tr>
+                    <th>등판순</th>
+                    <th>선수명</th>
+                    <th class="text-center">결과</th>
+                    <th class="text-center">이닝</th>
+                    <th class="text-center">투구수</th>
+                    <th class="text-center">타자</th>
+                    <th class="text-center">피안타</th>
+                    <th class="text-center">피홈런</th>
+                    <th class="text-center">사사구</th>
+                    <th class="text-center">삼진</th>
+                    <th class="text-center">실점</th>
+                    <th class="text-center">자책</th>
+                    <th class="text-center">시즌ERA</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr th:each="pitcher : ${detail.awayPitchers}">
+                    <td th:text="${pitcher.pitchOrder}"></td>
+                    <td th:text="${pitcher.playerName}"></td>
+                    <td class="text-center">
+                        <span th:switch="${pitcher.result}">
+                            <span th:case="'WIN'"  class="result-W">승</span>
+                            <span th:case="'LOSE'" class="result-L">패</span>
+                            <span th:case="'SAVE'" class="result-S">세</span>
+                            <span th:case="'HOLD'" class="text-info fw-bold">홀</span>
+                            <span th:case="*">-</span>
+                        </span>
+                    </td>
+                    <td class="text-center" th:text="${pitcher.inningsPitchedDisplay}"></td>
+                    <td class="text-center" th:text="${pitcher.pitches}"></td>
+                    <td class="text-center" th:text="${pitcher.battersFaced}"></td>
+                    <td class="text-center" th:text="${pitcher.hitsAgainst}"></td>
+                    <td class="text-center" th:text="${pitcher.homeRunsAgainst}"></td>
+                    <td class="text-center" th:text="${pitcher.walksHbp}"></td>
+                    <td class="text-center" th:text="${pitcher.strikeouts}"></td>
+                    <td class="text-center" th:text="${pitcher.runsAllowed}"></td>
+                    <td class="text-center" th:text="${pitcher.earnedRuns}"></td>
+                    <td class="text-center" th:text="${pitcher.seasonEra}"></td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<div th:if="${!detail.homePitchers.isEmpty()}" class="card shadow-sm mb-4">
+    <div class="card-header fw-semibold">
+        <i class="bi bi-person-arms-up me-1"></i>
+        <span th:text="${detail.game.homeTeam}"></span> 투수
+    </div>
+    <div class="table-responsive">
+        <table class="table table-sm table-hover mb-0">
+            <thead class="table-light">
+                <tr>
+                    <th>등판순</th>
+                    <th>선수명</th>
+                    <th class="text-center">결과</th>
+                    <th class="text-center">이닝</th>
+                    <th class="text-center">투구수</th>
+                    <th class="text-center">타자</th>
+                    <th class="text-center">피안타</th>
+                    <th class="text-center">피홈런</th>
+                    <th class="text-center">사사구</th>
+                    <th class="text-center">삼진</th>
+                    <th class="text-center">실점</th>
+                    <th class="text-center">자책</th>
+                    <th class="text-center">시즌ERA</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr th:each="pitcher : ${detail.homePitchers}">
+                    <td th:text="${pitcher.pitchOrder}"></td>
+                    <td th:text="${pitcher.playerName}"></td>
+                    <td class="text-center">
+                        <span th:switch="${pitcher.result}">
+                            <span th:case="'WIN'"  class="result-W">승</span>
+                            <span th:case="'LOSE'" class="result-L">패</span>
+                            <span th:case="'SAVE'" class="result-S">세</span>
+                            <span th:case="'HOLD'" class="text-info fw-bold">홀</span>
+                            <span th:case="*">-</span>
+                        </span>
+                    </td>
+                    <td class="text-center" th:text="${pitcher.inningsPitchedDisplay}"></td>
+                    <td class="text-center" th:text="${pitcher.pitches}"></td>
+                    <td class="text-center" th:text="${pitcher.battersFaced}"></td>
+                    <td class="text-center" th:text="${pitcher.hitsAgainst}"></td>
+                    <td class="text-center" th:text="${pitcher.homeRunsAgainst}"></td>
+                    <td class="text-center" th:text="${pitcher.walksHbp}"></td>
+                    <td class="text-center" th:text="${pitcher.strikeouts}"></td>
+                    <td class="text-center" th:text="${pitcher.runsAllowed}"></td>
+                    <td class="text-center" th:text="${pitcher.earnedRuns}"></td>
+                    <td class="text-center" th:text="${pitcher.seasonEra}"></td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- F. 경기 메타 정보 -->
+<div class="card shadow-sm mb-4">
+    <div class="card-header fw-semibold">
+        <i class="bi bi-info-circle me-1"></i> 경기 정보
+    </div>
+    <div class="card-body">
+        <div class="row g-3">
+            <div class="col-6 col-md-3" th:if="${detail.boxScore.crowdCn != null}">
+                <small class="text-muted d-block">관중</small>
+                <span th:text="${#numbers.formatInteger(detail.boxScore.crowdCn, 1, 'COMMA')} + '명'"></span>
+            </div>
+            <div class="col-6 col-md-3"
+                 th:if="${detail.boxScore.startTm != null and detail.boxScore.endTm != null}">
+                <small class="text-muted d-block">시작 / 종료</small>
+                <span th:text="${detail.boxScore.startTm + ' ~ ' + detail.boxScore.endTm}"></span>
+            </div>
+            <div class="col-6 col-md-3" th:if="${detail.boxScore.useTm != null}">
+                <small class="text-muted d-block">사용시간</small>
+                <span th:text="${detail.boxScore.useTm}"></span>
+            </div>
+            <div class="col-6 col-md-3"
+                 th:if="${detail.boxScore.finishingHit != null and !#strings.isEmpty(detail.boxScore.finishingHit)}">
+                <small class="text-muted d-block">결승타</small>
+                <span th:text="${detail.boxScore.finishingHit}"></span>
+            </div>
+            <div class="col-12"
+                 th:if="${detail.boxScore.umpires != null and !#strings.isEmpty(detail.boxScore.umpires)}">
+                <small class="text-muted d-block">심판</small>
+                <span th:text="${detail.boxScore.umpires}"></span>
+            </div>
+        </div>
+    </div>
+</div>
+
+</th:block><!-- /hasBoxScore -->
+
+</th:block><!-- /main-content -->
 </body>
 </html>

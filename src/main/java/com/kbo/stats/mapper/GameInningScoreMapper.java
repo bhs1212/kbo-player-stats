@@ -11,4 +11,5 @@ public interface GameInningScoreMapper {
     void insert(GameInningScore e);
     int deleteByGameId(@Param("gameId") Long gameId);
     List<GameInningScore> findByGameId(@Param("gameId") Long gameId);
+    List<GameInningScore> findAllByGameId(@Param("gameId") Long gameId);
 }

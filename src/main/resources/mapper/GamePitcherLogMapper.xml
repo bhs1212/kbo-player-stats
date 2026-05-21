@@ -55,4 +55,38 @@
         ORDER BY team_side, pitch_order
     </select>
 
+    <select id="findAllByGameId" resultMap="GamePitcherLogResultMap">
+        SELECT * FROM game_pitcher_log
+        WHERE game_id = #{gameId}
+        ORDER BY team_side ASC, pitch_order ASC
+    </select>
+
+    <resultMap id="PitcherBoxScoreAggregateResultMap" type="com.kbo.stats.dto.PitcherBoxScoreAggregate">
+        <result property="playerId"         column="player_id"/>
+        <result property="totalInningsOuts" column="total_innings_outs"/>
+        <result property="totalEarnedRuns"  column="total_earned_runs"/>
+        <result property="totalWalksHbp"    column="total_walks_hbp"/>
+        <result property="totalHitsAgainst" column="total_hits_against"/>
+        <result property="gameCount"        column="game_count"/>
+    </resultMap>
+
+    <select id="aggregateByPlayerId" resultMap="PitcherBoxScoreAggregateResultMap">
+        SELECT
+            p.id                                        AS player_id,
+            COALESCE(SUM(pl.innings_pitched_outs), 0)  AS total_innings_outs,
+            COALESCE(SUM(pl.earned_runs), 0)           AS total_earned_runs,
+            COALESCE(SUM(pl.walks_hbp), 0)             AS total_walks_hbp,
+            COALESCE(SUM(pl.hits_against), 0)          AS total_hits_against,
+            COUNT(DISTINCT pl.game_id)                 AS game_count
+        FROM player p
+        JOIN game_pitcher_log pl ON pl.player_name = p.name
+        JOIN game g ON g.id = pl.game_id
+            AND (
+                (pl.team_side = 'AWAY' AND g.away_team = p.team)
+                OR (pl.team_side = 'HOME' AND g.home_team = p.team)
+            )
+        WHERE p.id = #{playerId}
+        GROUP BY p.id
+    </select>
+
 </mapper>
