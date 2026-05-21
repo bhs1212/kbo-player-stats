@@ -67,11 +67,12 @@ public class CrawlingService {
     private static final String TABLE_ROW_SEL = "table.tData01 tbody tr";
     private static final String PAGER_LINK_SEL = "div.paging a";
 
-    private final PlayerService playerService;
-    private final PlayerMapper playerMapper;
-    private final BatterStatsMapper batterStatsMapper;
-    private final PitcherStatsMapper pitcherStatsMapper;
-    private final SabermetricsService sabermetricsService;
+    private final PlayerService                  playerService;
+    private final PlayerMapper                   playerMapper;
+    private final BatterStatsMapper              batterStatsMapper;
+    private final PitcherStatsMapper             pitcherStatsMapper;
+    private final SabermetricsService            sabermetricsService;
+    private final BoxScoreCrossValidationService boxScoreCrossValidationService;
 
     public void crawlAll() {
         log.info("=== KBO 크롤링 시작 (시즌: {}) ===", CURRENT_SEASON);
@@ -485,6 +486,7 @@ public class CrawlingService {
         }
 
         log.info("[검증] 완료 - 총 {}건 기록", total);
+        boxScoreCrossValidationService.runCrossValidation();
     }
 
     // ── 세이버메트릭스 크롤링 ─────────────────────────────────────────
