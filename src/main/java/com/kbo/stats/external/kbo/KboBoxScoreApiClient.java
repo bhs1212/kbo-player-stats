@@ -1,12 +1,15 @@
 package com.kbo.stats.external.kbo;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.kbo.stats.external.kbo.dto.KboBoxScoreResponse;
 import com.kbo.stats.external.kbo.dto.KboScoreBoardResponse;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.MediaType;
+import org.springframework.http.codec.json.Jackson2JsonDecoder;
 import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.BodyInserters;
+import org.springframework.web.reactive.function.client.ExchangeStrategies;
 import org.springframework.web.reactive.function.client.WebClient;
 
 @Slf4j
@@ -19,11 +22,32 @@ public class KboBoxScoreApiClient {
 
     public KboBoxScoreApiClient(
             @Value("${kbo.api.scoreboard-url}") String scoreBoardUrl,
-            @Value("${kbo.api.boxscore-url}")   String boxScoreUrl) {
+            @Value("${kbo.api.boxscore-url}") String boxScoreUrl,
+            ObjectMapper objectMapper) {
         this.scoreBoardUrl = scoreBoardUrl;
-        this.boxScoreUrl   = boxScoreUrl;
+        this.boxScoreUrl = boxScoreUrl;
+
+        // KBO는 JSON 본문을 Content-Type: text/plain 으로 반환 → text/plain 도 JSON 디코더에 매핑
+        Jackson2JsonDecoder jsonDecoder = new Jackson2JsonDecoder(
+                objectMapper,
+                MediaType.APPLICATION_JSON,
+                MediaType.TEXT_PLAIN);
+
+        ExchangeStrategies strategies = ExchangeStrategies.builder()
+                .codecs(config -> {
+                    config.defaultCodecs().maxInMemorySize(4 * 1024 * 1024);
+                    config.defaultCodecs().jackson2JsonDecoder(jsonDecoder);
+                })
+                .build();
+
         this.webClient = WebClient.builder()
-                .codecs(config -> config.defaultCodecs().maxInMemorySize(4 * 1024 * 1024))
+                .exchangeStrategies(strategies)
+                // KBO .asmx 봇 탐지 우회용 헤더
+                .defaultHeader("User-Agent",
+                        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+                                + "(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
+                .defaultHeader("Referer", "https://www.koreabaseball.com/Schedule/ScoreBoard.aspx")
+                .defaultHeader("X-Requested-With", "XMLHttpRequest")
                 .build();
     }
 
