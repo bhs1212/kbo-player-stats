@@ -94,6 +94,16 @@ src/main/java/com/kbo/stats/
 - **player**: 선수 기록 (KBO 공식 사이트에서 자동 수집)
 - **game**: 경기 일정/결과 (status: SCHEDULED, FINISHED, POSTPONED, CANCELED 등)
 
+### 박스스코어 도메인 (game 테이블에 1:N 관계, ON DELETE CASCADE)
+
+- **game_boxscore**: 경기 메타 (관중수, 시작/종료 시간, 심판, 결승타)
+- **game_inning_score**: 이닝별 점수 (경기 × 이닝 × 팀)
+- **game_event**: 주요 이벤트 (홈런, 결승타, 심판 판정)
+- **game_batter_log**: 타자 출장 기록 (타순, 포지션, 타수, 안타, 타점, 시즌 평균)
+- **game_pitcher_log**: 투수 등판 기록 (등판 순서, 이닝 outs, 자책점, 시즌 ERA)
+
+이닝은 outs 정수로 저장 (5⅔이닝 = 17 outs). BigDecimal 반올림 경계값 문제 회피.
+
 ## ✨ 주요 기능
 
 ### 인증/권한
@@ -120,6 +130,17 @@ src/main/java/com/kbo/stats/
 - 팀 대표색 표시 + 승패 강조 (승리팀 굵게, 패배팀 회색)
 - 시점별 seriesId 동적 분기 (10월 이후 포스트시즌 자동 포함)
 - 매일 새벽 4시 / 오후 11시 자동 갱신 스케줄러
+
+### 경기 박스스코어
+
+- KBO 박스스코어 API에서 경기별 상세 데이터 자동 수집 (이닝 점수, 주요 이벤트, 타자/투수 출장 기록)
+- 5개 정규화 테이블 (게임 메타, 이닝, 이벤트, 타자 로그, 투수 로그) - 1:N + ON DELETE CASCADE
+- `INSERT ON DUPLICATE KEY UPDATE` + `deleteByGameId`로 멱등 ETL
+- Spring Cache(`@Cacheable`) + `@CacheEvict`로 GET 최적화 및 데이터 변경 시 자동 무효화
+- 단일 경기 + 날짜별 일괄 수집 컨트롤러, 500ms 간격 sleep
+- 12회 연장, 끝내기 경기 등 엣지 케이스 처리
+- 시즌 전체 216경기 박스스코어 적재 + KBO 공식 사이트와 1:1 정합성 검증
+- 매일 23:50 자동 수집 스케줄러 (`@Scheduled`)
 
 ### AI 챗봇
 
@@ -180,33 +201,65 @@ Claude API는 호출당 과금이라 동일 질문 반복이나 악의적 다량
 - **Bucket4j Rate Limiting**: 토큰 버킷 알고리즘으로 IP별 분당 10회 / 일 500회 제한
 - **RAG 패턴**: 1단계로 사용자 의도 파악 후 DB에서 실제 데이터 조회 → 그 데이터를 컨텍스트로 LLM에 전달. LLM이 추측으로 답하지 못하게 차단
 
+### 5. KBO 박스스코어 API 디버깅 — 4단계 함정 추적
+
+박스스코어 데이터 수집을 위해 KBO의 `.asmx` 엔드포인트를 호출했는데 처음엔 응답이 계속 엉뚱하게 왔습니다. 단계별로 좁혀가야 했습니다.
+
+처음엔 HTTP 200을 받았는데 사용자 화면에선 권한 거부 페이지로 리다이렉트됐습니다. Spring Security의 CSRF 토큰 누락 때문에 `InvalidCsrfTokenException`이 발생했고, 이게 `AccessDeniedException`의 하위 예외라 권한 거부로 분기된 거였습니다. SecurityConfig에서 해당 endpoint를 CSRF 예외에 등록해서 해결.
+
+다음엔 응답이 KBO가 아닌 다른 사이트에서 오는 걸 알아차렸습니다. 환경변수 fallback default 값에 잘못된 URL이 박혀 있었습니다. `application.yml`을 KBO 공식 endpoint로 바꿔 해결.
+
+세 번째로 응답이 `Content-Type: text/html`에 KBO 에러 페이지가 들어왔습니다. KBO 사이트가 `.asmx` AJAX 엔드포인트에 `Referer`/`User-Agent`/`X-Requested-With` 헤더 검증을 걸어둔 거였습니다. WebClient에 브라우저 헤더를 `defaultHeader`로 추가하니 정상 JSON이 응답됐습니다.
+
+마지막으로 응답이 JSON인데 Content-Type이 `text/plain`으로 와서 Spring WebClient의 Jackson 디코더가 매칭 못 하는 문제. `ExchangeStrategies`로 Jackson2JsonDecoder의 미디어 타입에 `text/plain`을 추가해서 해결.
+
+각 단계마다 응답 메시지의 패턴(200 OK + redirect, `baseUrl` 합성 형태, 에러 페이지의 `<title>` 태그)을 단서로 역추적했습니다.
+
+```java
+Jackson2JsonDecoder jsonDecoder = new Jackson2JsonDecoder(
+        objectMapper,
+        MediaType.APPLICATION_JSON,
+        MediaType.TEXT_PLAIN);  // KBO API는 JSON을 text/plain으로 응답
+
+this.webClient = WebClient.builder()
+    .exchangeStrategies(ExchangeStrategies.builder()
+        .codecs(c -> c.defaultCodecs().jackson2JsonDecoder(jsonDecoder))
+        .build())
+    .defaultHeader("User-Agent", "Mozilla/5.0 ...")
+    .defaultHeader("Referer", "https://www.koreabaseball.com/Schedule/ScoreBoard.aspx")
+    .defaultHeader("X-Requested-With", "XMLHttpRequest")
+    .build();
+```
+
+### 6. 박스스코어 교차 검증으로 KBO 사이트 내부 비일관성 발견
+
+박스스코어 데이터가 정확한지 검증하기 위해, 박스스코어 누적값으로 직접 계산한 타율/ERA/WHIP를 KBO 시즌 통계와 비교하는 서비스를 만들었습니다. 결과를 `stat_validation_log` 테이블에 적재하는 방식.
+
+처음 일치율은 타율 33%, ERA 80%, WHIP 51%였습니다 (허용 오차 0.001/0.05). 처음엔 박스스코어 수집과 KBO 시즌 통계 갱신의 시점 차이라고 가정했는데, 5/19 데이터를 동기화한 후에도 일치율이 거의 그대로였습니다.
+
+박재현(KIA) 사례를 깊게 추적했습니다. 박스스코어 합산은 40경기 42안타, KBO 시즌 통계는 40경기 47안타. **경기 수가 같은데 안타 수가 5개 차이**가 났습니다. 시점 차이가 원인이었으면 경기 수도 달라야 했습니다.
+
+KBO 공식 박스스코어 페이지에서 박재현이 출전한 5경기 (4/30, 4/26, 4/16, 5/05, 5/02)의 안타 수를 직접 1:1 대조한 결과, 우리 DB 값과 KBO 박스스코어 페이지 값이 100% 일치했습니다. 즉 차이는 우리 시스템이 아니라 **KBO 사이트 내부에 있었습니다**. KBO의 박스스코어 페이지와 시즌 통계 페이지가 서로 다른 집계 방식이나 시점을 사용하고 있던 거였습니다.
+
+검증 도구가 없었다면 알아차리지 못했을 외부 데이터 소스의 한계였고, 우리 박스스코어 시스템의 정확성을 외부 검증으로 입증한 결과이기도 했습니다.
+
 ## 🤖 AI 협업 개발 방식
 
-이 프로젝트는 **Claude Code**(Anthropic의 AI 코딩 어시스턴트)와의 페어 프로그래밍으로 개발했습니다. 단순히 코드를 생성받아 붙여넣는 방식이 아니라, AI를 협업 파트너로 두고 설계 → 구현 → 디버깅 사이클을 함께 진행했습니다.
+이 프로젝트는 Claude Code(Anthropic의 AI 코딩 어시스턴트)와 함께 개발했습니다. 코드를 받아 그대로 붙여넣는 게 아니라 설계, 구현, 디버깅 사이클을 같이 돌리는 페어 프로그래밍 방식으로 진행했습니다.
 
-### 활용 방식
+### 활용한 방식
 
-- **기능 설계 단계**: 요구사항을 정리해 Claude Code에 전달하고 초기 구현 생성. 그대로 사용하지 않고 프로젝트 컨벤션과 기존 코드 패턴에 맞게 검토·수정
-- **디버깅 단계**: 콘솔 로그와 에러 메시지를 직접 분석한 뒤 가설을 세워 Claude Code와 함께 검증. AI가 놓친 부분은 직접 사이트 구조 분석이나 SQL 쿼리로 보완
-- **의사결정 단계**: Claude Code가 제안한 해결책 중 trade-off를 비교해 선택. 예: 자동화 범위, 라이브러리 도입 여부, 휴리스틱 vs 명시적 분기 등
+요구사항을 정리해서 Claude Code에 전달하고 초기 구현을 받은 다음, 프로젝트 컨벤션과 기존 코드 스타일에 맞춰 검토·수정했습니다. 디버깅할 때는 콘솔 로그와 에러 메시지를 직접 분석해 가설을 세운 뒤 AI와 함께 검증하는 식으로 풀었습니다. 의사결정 단계에서는 AI가 제시한 여러 옵션 중 trade-off를 비교해 직접 선택했습니다.
 
-### AI에게 맡기지 않은 영역
+### 직접 한 부분
 
-- **외부 시스템 구조 분석**: 네이버 스포츠 SPA의 클래스명, KBO 사이트의 ASP.NET 드롭다운 동작 등은 브라우저 개발자 도구로 직접 확인
-- **데이터 검증**: SQL 쿼리로 실제 저장된 데이터의 이상 징후를 확인하고 원인 추적
-- **요구사항 정의와 우선순위**: 어떤 기능을 어디까지 만들지, 어떤 trade-off를 받아들일지
+외부 시스템의 구조 분석은 결국 사람이 브라우저 개발자 도구를 직접 열어야 했습니다. 네이버 스포츠의 React 빌드 해시 클래스, KBO 사이트의 ASP.NET 드롭다운 동작, KBO `.asmx` 엔드포인트의 봇 차단 헤더 같은 것들이 그렇습니다. 데이터 검증도 SQL 쿼리로 직접 이상 징후를 추적했습니다. 어떤 기능을 어디까지 만들지, 어떤 trade-off를 받아들일지 결정한 것도 제 몫이었습니다.
 
-### 협업으로 해결한 대표 사례
+박스스코어 교차 검증 사례가 대표적입니다. 일치율이 33%로 나왔을 때 AI가 제시한 첫 가설(시점 차이)을 검증한 다음 그게 틀렸음을 데이터로 확인하고, KBO 공식 사이트에서 5경기 직접 대조까지 진행하면서 진짜 원인(외부 데이터 소스 비일관성)을 추적한 건 사람이 해야 하는 영역이었습니다.
 
-- 네이버 스포츠의 React 빌드 해시 클래스를 직접 분석해 정확한 selector를 전달, AI가 잡지 못하던 매칭 문제 해결
-- KBO 사이트가 URL 파라미터를 무시한다는 사실을 직접 확인하고 Selenium 드롭다운 조작 방향을 제안
-- 10월/11월에 들어온 placeholder 데이터를 SQL로 진단하고 시점 기반 동적 분기 로직 도출
+### 느낀 점
 
-### 배운 점
-
-- AI가 만드는 코드의 정확성은 입력 컨텍스트의 질에 비례한다는 것
-- 디버깅의 핵심인 가설 수립과 원인 추적은 사람이 직접 해야 한다는 것
-- AI를 코드 생성기로 보기보다 페어 프로그래밍 파트너로 활용할 때 효과가 크다는 것
+AI가 만드는 코드의 품질은 결국 입력 컨텍스트의 품질에 비례한다는 걸 여러 번 체감했습니다. 디버깅의 핵심인 가설 수립과 원인 추적은 결국 사람이 해야 했고, AI를 코드 생성기보다는 페어 프로그래밍 파트너로 활용할 때 효과가 가장 컸습니다.
 
 ## 📸 화면 미리보기
 
@@ -307,18 +360,22 @@ API 문서는 `http://localhost:8080/swagger-ui.html`에서 확인할 수 있습
 
 ## 📡 REST API
 
-| Method | URL                     | 설명             | 권한  |
-| ------ | ----------------------- | ---------------- | ----- |
-| GET    | /api/v1/players         | 선수 목록 조회   | 모두  |
-| GET    | /api/v1/players/{id}    | 선수 상세 조회   | 모두  |
-| POST   | /api/v1/players         | 선수 등록        | ADMIN |
-| PUT    | /api/v1/players/{id}    | 선수 수정        | ADMIN |
-| DELETE | /api/v1/players/{id}    | 선수 삭제        | ADMIN |
-| GET    | /api/v1/games?from=&to= | 경기 일정 조회   | 모두  |
-| GET    | /api/v1/games/{id}      | 경기 상세 조회   | 모두  |
-| POST   | /games/crawl            | 경기 데이터 갱신 | ADMIN |
-| POST   | /players/crawl          | 선수 데이터 갱신 | ADMIN |
-| POST   | /api/v1/chatbot         | 챗봇 질의        | 모두  |
-| POST   | /signup                 | 회원가입         | 익명  |
-| GET    | /my/profile             | 마이페이지       | USER  |
-| POST   | /my/team                | 응원팀 변경      | USER  |
+| Method | URL                              | 설명                             | 권한  |
+| ------ | -------------------------------- | -------------------------------- | ----- |
+| GET    | /api/v1/players                  | 선수 목록 조회                   | 모두  |
+| GET    | /api/v1/players/{id}             | 선수 상세 조회                   | 모두  |
+| POST   | /api/v1/players                  | 선수 등록                        | ADMIN |
+| PUT    | /api/v1/players/{id}             | 선수 수정                        | ADMIN |
+| DELETE | /api/v1/players/{id}             | 선수 삭제                        | ADMIN |
+| GET    | /api/v1/games?from=&to=          | 경기 일정 조회                   | 모두  |
+| GET    | /api/v1/games/{id}               | 경기 상세 조회                   | 모두  |
+| POST   | /games/crawl                     | 경기 데이터 갱신                 | ADMIN |
+| POST   | /players/crawl                   | 선수 데이터 갱신                 | ADMIN |
+| POST   | /api/v1/chatbot                  | 챗봇 질의                        | 모두  |
+| POST   | /signup                          | 회원가입                         | 익명  |
+| GET    | /my/profile                      | 마이페이지                       | USER  |
+| POST   | /my/team                         | 응원팀 변경                      | USER  |
+| GET    | /api/v1/games/{id}/detail        | 경기 상세 + 박스스코어 조회      | 모두  |
+| POST   | /crawling/boxscore?gameId={id}   | 단일 경기 박스스코어 수집        | ADMIN |
+| POST   | /crawling/boxscore?date=YYYYMMDD | 날짜별 박스스코어 일괄 수집      | ADMIN |
+| POST   | /crawling/cross-validation       | 박스스코어 ↔ 시즌 통계 교차 검증 | ADMIN |
