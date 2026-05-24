@@ -45,6 +45,13 @@ public class CacheConfig {
                         .maximumSize(20)
                         .<Object, Object>build());
 
+        // 선수 vs 팀 전적 캐시: 박스스코어 집계 (5분)
+        manager.registerCustomCache("playerVsTeam",
+                Caffeine.newBuilder()
+                        .expireAfterWrite(5, TimeUnit.MINUTES)
+                        .maximumSize(500)
+                        .<Object, Object>build());
+
         return manager;
     }
 }
