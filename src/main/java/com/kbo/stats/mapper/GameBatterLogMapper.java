@@ -2,6 +2,7 @@ package com.kbo.stats.mapper;
 
 import com.kbo.stats.domain.GameBatterLog;
 import com.kbo.stats.dto.BatterBoxScoreAggregate;
+import com.kbo.stats.dto.PlayerVsTeamDto;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 
@@ -14,4 +15,5 @@ public interface GameBatterLogMapper {
     List<GameBatterLog> findByGameId(@Param("gameId") Long gameId);
     List<GameBatterLog> findAllByGameId(@Param("gameId") Long gameId);
     BatterBoxScoreAggregate aggregateByPlayerId(@Param("playerId") Long playerId);
+    List<PlayerVsTeamDto> aggregateBatterVsTeams(@Param("playerName") String playerName);
 }

@@ -13,7 +13,7 @@ spring:
 
   cache:
     type: caffeine
-    cache-names: leagueStats,gameDetail
+    cache-names: leagueStats,gameDetail,playerVsTeam
     caffeine:
       spec: expireAfterWrite=300s,maximumSize=100
 

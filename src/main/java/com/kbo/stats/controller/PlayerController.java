@@ -7,10 +7,12 @@ import com.kbo.stats.domain.PlayerType;
 import com.kbo.stats.dto.PageDto;
 import com.kbo.stats.dto.PlayerFormDto;
 import com.kbo.stats.dto.PlayerSearchDto;
+import com.kbo.stats.dto.PlayerVsTeamDto;
 import com.kbo.stats.mapper.BatterStatsMapper;
 import com.kbo.stats.mapper.PitcherStatsMapper;
 import com.kbo.stats.service.CsvImportService;
 import com.kbo.stats.service.PlayerService;
+import com.kbo.stats.service.PlayerVsTeamService;
 import com.kbo.stats.service.SabermetricsService;
 import io.swagger.v3.oas.annotations.Hidden;
 import jakarta.validation.Valid;
@@ -37,6 +39,7 @@ public class PlayerController {
     private final BatterStatsMapper batterStatsMapper;
     private final PitcherStatsMapper pitcherStatsMapper;
     private final SabermetricsService sabermetricsService;
+    private final PlayerVsTeamService playerVsTeamService;
 
     /** 선수 목록 */
     @GetMapping
@@ -136,6 +139,9 @@ public class PlayerController {
                 model.addAttribute("hr9Percentile",  sabermetricsService.getPitcherPercentileHR9(hrPer9));
             }
         }
+
+        List<PlayerVsTeamDto> vsTeams = playerVsTeamService.findByPlayerId(id);
+        model.addAttribute("vsTeams", vsTeams);
 
         return "player/detail";
     }

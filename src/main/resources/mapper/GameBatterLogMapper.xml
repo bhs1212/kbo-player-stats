@@ -53,6 +53,22 @@
         <result property="gameCount"   column="game_count"/>
     </resultMap>
 
+    <select id="aggregateBatterVsTeams" resultType="com.kbo.stats.dto.PlayerVsTeamDto">
+        SELECT
+            CASE WHEN gbl.team_side = 'AWAY' THEN g.home_team ELSE g.away_team END AS opponent,
+            COUNT(DISTINCT gbl.game_id) AS games,
+            SUM(at_bats) AS atBats,
+            SUM(hits) AS hits,
+            SUM(rbi) AS rbi,
+            SUM(walks) AS walks,
+            ROUND(SUM(hits) * 1.0 / NULLIF(SUM(at_bats), 0), 3) AS avg
+        FROM game_batter_log gbl
+        JOIN game g ON g.id = gbl.game_id
+        WHERE gbl.player_name = #{playerName}
+        GROUP BY opponent
+        ORDER BY avg DESC
+    </select>
+
     <select id="aggregateByPlayerId" resultMap="BatterBoxScoreAggregateResultMap">
         SELECT
             p.id                          AS player_id,

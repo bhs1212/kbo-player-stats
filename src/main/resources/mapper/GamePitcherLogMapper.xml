@@ -70,6 +70,24 @@
         <result property="gameCount"        column="game_count"/>
     </resultMap>
 
+    <select id="aggregatePitcherVsTeams" resultType="com.kbo.stats.dto.PlayerVsTeamDto">
+        SELECT
+            CASE WHEN gpl.team_side = 'AWAY' THEN g.home_team ELSE g.away_team END AS opponent,
+            COUNT(DISTINCT gpl.game_id) AS games,
+            COALESCE(SUM(gpl.innings_pitched_outs), 0) AS inningsOuts,
+            COALESCE(SUM(gpl.earned_runs), 0) AS earnedRuns,
+            COALESCE(SUM(gpl.hits_against), 0) AS hitsAllowed,
+            COALESCE(SUM(gpl.walks_hbp), 0) AS walksHbp,
+            COALESCE(SUM(gpl.strikeouts), 0) AS strikeouts,
+            ROUND(SUM(gpl.earned_runs) * 27.0 / NULLIF(SUM(gpl.innings_pitched_outs), 0), 2) AS era,
+            ROUND((SUM(gpl.walks_hbp) + SUM(gpl.hits_against)) * 3.0 / NULLIF(SUM(gpl.innings_pitched_outs), 0), 2) AS whip
+        FROM game_pitcher_log gpl
+        JOIN game g ON g.id = gpl.game_id
+        WHERE gpl.player_name = #{playerName}
+        GROUP BY opponent
+        ORDER BY era ASC
+    </select>
+
     <select id="aggregateByPlayerId" resultMap="PitcherBoxScoreAggregateResultMap">
         SELECT
             p.id                                        AS player_id,

@@ -3,6 +3,7 @@ package com.kbo.stats.controller.api;
 import com.kbo.stats.domain.Player;
 import com.kbo.stats.dto.*;
 import com.kbo.stats.service.PlayerService;
+import com.kbo.stats.service.PlayerVsTeamService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -25,6 +26,7 @@ import java.util.List;
 public class PlayerApiController {
 
     private final PlayerService playerService;
+    private final PlayerVsTeamService playerVsTeamService;
 
     @Operation(summary = "선수 목록 검색", description = "이름, 팀, 포지션, 선수 유형으로 필터링하여 페이지네이션된 선수 목록을 반환합니다.")
     @GetMapping
@@ -102,5 +104,12 @@ public class PlayerApiController {
     @GetMapping("/teams")
     public ApiResponse<List<String>> teams() {
         return ApiResponse.ok(playerService.findAllTeams());
+    }
+
+    @Operation(summary = "상대 팀별 전적", description = "선수 ID로 상대 팀별 집계 전적을 반환합니다. 타자는 타율 내림차순, 투수는 ERA 오름차순 정렬.")
+    @GetMapping("/{id}/vs-team")
+    public ResponseEntity<List<PlayerVsTeamDto>> getVsTeam(
+            @Parameter(description = "선수 ID") @PathVariable Long id) {
+        return ResponseEntity.ok(playerVsTeamService.findByPlayerId(id));
     }
 }
