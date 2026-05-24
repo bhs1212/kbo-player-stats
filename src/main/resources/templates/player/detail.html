@@ -619,7 +619,18 @@
     </span>
 </div>
 
-<!-- ── 섹션 4: 상대 팀별 전적 ─────────────────────────────────────── -->
+<!-- ── 섹션 4: 상대 팀별 차트 ─────────────────────────────────────── -->
+<div class="card mt-4" th:if="${vsTeams != null and !vsTeams.isEmpty()}">
+    <div class="card-header">
+        <h5 class="mb-0"
+            th:text="${player.playerType.name() == 'BATTER'} ? '상대 팀별 타율' : '상대 팀별 ERA'"></h5>
+    </div>
+    <div class="card-body">
+        <canvas id="vsTeamChart" style="max-height: 350px;"></canvas>
+    </div>
+</div>
+
+<!-- ── 섹션 5: 상대 팀별 전적 표 ─────────────────────────────────── -->
 <div class="card mt-4">
     <div class="card-header">
         <h5 class="mb-0"><i class="bi bi-diagram-3"></i> 상대 팀별 전적</h5>
@@ -800,6 +811,73 @@
     });
 </script>
 </th:block>
+
+<!-- 상대 팀별 차트 -->
+<script th:inline="javascript" th:if="${vsTeams != null and !vsTeams.isEmpty()}">
+(function() {
+    const vsTeamData = /*[[${vsTeams}]]*/ [];
+    const playerType = /*[[${player.playerType.name()}]]*/ 'BATTER';
+
+    const teamColors = {
+        'KIA': '#EA0029', 'KT': '#000000', 'LG': '#C30452', 'NC': '#315288',
+        'SSG': '#CE0E2D', '두산': '#131230', '롯데': '#041E42', '삼성': '#074CA1',
+        '키움': '#820024', '한화': '#FF6600'
+    };
+
+    const labels = vsTeamData.map(function(v) { return v.opponent; });
+    const backgroundColors = labels.map(function(t) { return teamColors[t] || '#888888'; });
+
+    const isBatter = playerType === 'BATTER';
+    const dataValues = vsTeamData.map(function(v) {
+        const val = isBatter ? v.avg : v.era;
+        return val == null ? null : parseFloat(val);
+    });
+
+    const ctx = document.getElementById('vsTeamChart').getContext('2d');
+    new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: labels,
+            datasets: [{
+                label: isBatter ? '타율' : 'ERA',
+                data: dataValues,
+                backgroundColor: backgroundColors,
+                borderRadius: 4
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    callbacks: {
+                        afterLabel: function(context) {
+                            const v = vsTeamData[context.dataIndex];
+                            if (isBatter) {
+                                return ['경기: ' + v.games, '타수: ' + v.atBats, '안타: ' + v.hits, '타점: ' + v.rbi];
+                            } else {
+                                return ['경기: ' + v.games, '이닝 outs: ' + v.inningsOuts, '자책: ' + v.earnedRuns, 'WHIP: ' + v.whip];
+                            }
+                        }
+                    }
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    max: isBatter ? 0.7 : undefined,
+                    ticks: {
+                        callback: function(value) {
+                            return isBatter ? value.toFixed(3) : value.toFixed(2);
+                        }
+                    }
+                }
+            }
+        }
+    });
+})();
+</script>
 
 <script>
     document.addEventListener('DOMContentLoaded', function () {
