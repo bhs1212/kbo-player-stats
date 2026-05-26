@@ -127,6 +127,11 @@
         ORDER BY game_date, game_time
     </select>
 
+    <!-- 상태별 ID 목록 (매치업 재구성용) -->
+    <select id="findIdsByStatus" resultType="long">
+        SELECT id FROM game WHERE status = #{status} ORDER BY game_date, id
+    </select>
+
     <!-- 경기 등록/업데이트 (날짜+팀 UNIQUE KEY 중복 시 점수·상태 갱신) -->
     <insert id="upsert" parameterType="com.kbo.stats.domain.Game">
         INSERT INTO game (game_date, game_time, away_team, home_team,

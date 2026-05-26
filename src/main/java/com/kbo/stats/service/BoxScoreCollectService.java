@@ -32,6 +32,7 @@ public class BoxScoreCollectService {
     private final KboBoxScoreApiClient apiClient;
     private final KboResponseParser parser;
     private final ObjectMapper objectMapper;
+    private final MatchupRebuildService matchupRebuildService;
 
     /**
      * 단일 게임 박스스코어 수집 + DB 영속.
@@ -77,6 +78,14 @@ public class BoxScoreCollectService {
 
         // 6. 트랜잭션 내 delete + insert
         persistAll(gameId, parsed);
+
+        // 7. 매치업 재구성 (REQUIRES_NEW 트랜잭션 — 실패해도 박스스코어 적재는 유지)
+        try {
+            int matchupCount = matchupRebuildService.rebuildOne(gameId);
+            log.info("[박스스코어] 매치업 재구성 완료 gameId={} count={}", gameId, matchupCount);
+        } catch (Exception e) {
+            log.error("[박스스코어] 매치업 재구성 실패 gameId={} (박스스코어 적재는 성공)", gameId, e);
+        }
 
         log.info("[박스스코어] SUCCESS gameId={} kboGameId={}", gameId, kboGameId);
         return BoxScoreCollectResult.success(gameId, kboGameId);

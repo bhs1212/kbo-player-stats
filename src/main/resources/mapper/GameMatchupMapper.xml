@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.kbo.stats.mapper.GameMatchupMapper">
+
+    <resultMap id="GameMatchupResultMap" type="com.kbo.stats.domain.GameMatchup">
+        <id     property="id"                 column="id"/>
+        <result property="gameId"             column="game_id"/>
+        <result property="inning"             column="inning"/>
+        <result property="atBatOrder"         column="at_bat_order"/>
+        <result property="batterTeamSide"     column="batter_team_side"/>
+        <result property="batterName"         column="batter_name"/>
+        <result property="batterBattingOrder" column="batter_batting_order"/>
+        <result property="pitcherName"        column="pitcher_name"/>
+        <result property="pitcherPitchOrder"  column="pitcher_pitch_order"/>
+        <result property="result"             column="result"/>
+        <result property="createdAt"          column="created_at"/>
+    </resultMap>
+
+    <insert id="insertBatch">
+        INSERT INTO game_matchup
+            (game_id, inning, at_bat_order, batter_team_side, batter_name,
+             batter_batting_order, pitcher_name, pitcher_pitch_order, result)
+        VALUES
+        <foreach collection="matchups" item="m" separator=",">
+            (#{m.gameId}, #{m.inning}, #{m.atBatOrder}, #{m.batterTeamSide},
+             #{m.batterName}, #{m.batterBattingOrder}, #{m.pitcherName},
+             #{m.pitcherPitchOrder}, #{m.result})
+        </foreach>
+    </insert>
+
+    <delete id="deleteByGameId">
+        DELETE FROM game_matchup WHERE game_id = #{gameId}
+    </delete>
+
+    <select id="findByGameId" resultMap="GameMatchupResultMap">
+        SELECT * FROM game_matchup
+        WHERE game_id = #{gameId}
+        ORDER BY batter_team_side, at_bat_order
+    </select>
+
+</mapper>

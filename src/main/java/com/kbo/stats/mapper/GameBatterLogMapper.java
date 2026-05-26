@@ -14,6 +14,7 @@ public interface GameBatterLogMapper {
     int deleteByGameId(@Param("gameId") Long gameId);
     List<GameBatterLog> findByGameId(@Param("gameId") Long gameId);
     List<GameBatterLog> findAllByGameId(@Param("gameId") Long gameId);
+    List<GameBatterLog> findByGameIdAndTeamSide(@Param("gameId") Long gameId, @Param("teamSide") String teamSide);
     BatterBoxScoreAggregate aggregateByPlayerId(@Param("playerId") Long playerId);
     List<PlayerVsTeamDto> aggregateBatterVsTeams(@Param("playerName") String playerName);
 }

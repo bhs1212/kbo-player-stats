@@ -55,6 +55,12 @@
         ORDER BY team_side, pitch_order
     </select>
 
+    <select id="findByGameIdAndTeamSide" resultMap="GamePitcherLogResultMap">
+        SELECT * FROM game_pitcher_log
+        WHERE game_id = #{gameId} AND team_side = #{teamSide}
+        ORDER BY pitch_order
+    </select>
+
     <select id="findAllByGameId" resultMap="GamePitcherLogResultMap">
         SELECT * FROM game_pitcher_log
         WHERE game_id = #{gameId}

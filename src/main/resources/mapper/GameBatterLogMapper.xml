@@ -40,6 +40,12 @@
         ORDER BY team_side, batting_order
     </select>
 
+    <select id="findByGameIdAndTeamSide" resultMap="GameBatterLogResultMap">
+        SELECT * FROM game_batter_log
+        WHERE game_id = #{gameId} AND team_side = #{teamSide}
+        ORDER BY batting_order
+    </select>
+
     <select id="findAllByGameId" resultMap="GameBatterLogResultMap">
         SELECT * FROM game_batter_log
         WHERE game_id = #{gameId}

@@ -47,4 +47,7 @@ public interface GameMapper {
 
     /** 기간 내 완료된 경기 조회 (박스스코어 크롤러용) */
     List<Game> findFinishedByDateRange(@Param("start") LocalDate start, @Param("end") LocalDate end);
+
+    /** 상태별 ID 목록 조회 (매치업 재구성용) */
+    List<Long> findIdsByStatus(@Param("status") GameStatus status);
 }

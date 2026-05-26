@@ -30,6 +30,8 @@ public class SecurityConfig {
                                                                 new AntPathRequestMatcher("/api/**"),
                                                                 new AntPathRequestMatcher("/crawling/boxscore", "POST"),
                                                                 new AntPathRequestMatcher("/crawling/cross-validation",
+                                                                                "POST"),
+                                                                new AntPathRequestMatcher("/crawling/matchup-rebuild**",
                                                                                 "POST")))
                                 .authorizeHttpRequests(auth -> auth
                                                 // ── 정적 리소스 및 공개 고정 경로 ──
@@ -79,6 +81,11 @@ public class SecurityConfig {
                                                 // 박스스코어 교차 검증
                                                 .requestMatchers(
                                                                 new AntPathRequestMatcher("/crawling/cross-validation",
+                                                                                "POST"))
+                                                .hasRole("ADMIN")
+                                                // 타자-투수 매치업 재구성
+                                                .requestMatchers(
+                                                                new AntPathRequestMatcher("/crawling/matchup-rebuild**",
                                                                                 "POST"))
                                                 .hasRole("ADMIN")
                                                 // 경기 일정 크롤링 수동 트리거 (ADMIN 전용)
