@@ -113,4 +113,9 @@ public class HomeController {
 
         return "home/dashboard";
     }
+
+    @GetMapping("/matchup")
+    public String matchupPage() {
+        return "matchup/index";
+    }
 }

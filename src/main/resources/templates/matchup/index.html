@@ -1,0 +1,504 @@
+<!DOCTYPE html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org"
+      th:replace="~{layout/base :: base(
+          title='매치업 비교',
+          content=~{::main-content},
+          extraHead=~{::matchup-style},
+          extraScript=~{::matchup-script})}">
+<head><title>매치업 비교</title></head>
+<body>
+
+<th:block th:fragment="matchup-style">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
+<style>
+  .autocomplete-suggestions {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    background: white;
+    border: 1px solid #ddd;
+    border-radius: 0.375rem;
+    max-height: 250px;
+    overflow-y: auto;
+    z-index: 1000;
+    display: none;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+  }
+  .autocomplete-suggestion {
+    padding: 10px 14px;
+    cursor: pointer;
+    border-bottom: 1px solid #f0f0f0;
+  }
+  .autocomplete-suggestion:hover { background: #f8f9fa; }
+  .autocomplete-suggestion:last-child { border-bottom: none; }
+  .player-team {
+    color: #6c757d;
+    font-size: 0.85rem;
+    margin-left: 8px;
+  }
+  .matchup-stat-cell {
+    padding: 1rem 0.5rem;
+    border-right: 1px solid #e9ecef;
+    text-align: center;
+  }
+  .matchup-stat-cell:last-child { border-right: none; }
+  .stat-label {
+    font-size: 0.78rem;
+    color: #6c757d;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: 0.25rem;
+  }
+  .stat-value {
+    font-size: 1.65rem;
+    font-weight: 700;
+    color: #212529;
+    line-height: 1.1;
+  }
+  .stat-value.highlight { color: #0d6efd; }
+  .result-badge {
+    font-weight: 500;
+    padding: 0.3em 0.6em;
+    font-size: 0.8rem;
+  }
+  .stat-card {
+    padding: 0.75rem;
+    border-right: 1px solid #e9ecef;
+    text-align: center;
+  }
+  .stat-card:last-child { border-right: none; }
+  @media (max-width: 768px) {
+    .stat-card {
+      border-right: none;
+      border-bottom: 1px solid #e9ecef;
+    }
+    .stat-value { font-size: 1.4rem; }
+  }
+</style>
+</th:block>
+
+<th:block th:fragment="main-content">
+<div>
+  <h4 class="mb-4">
+    <i class="bi bi-arrow-left-right text-primary"></i> 타자 vs 투수 매치업
+  </h4>
+
+  <!-- 검색 카드 -->
+  <div class="card shadow-sm mb-4">
+    <div class="card-body">
+      <div class="row g-3 align-items-end">
+        <!-- 타자 검색 -->
+        <div class="col-md-5 position-relative">
+          <label class="form-label fw-bold">
+            <i class="bi bi-person-fill text-primary"></i> 타자
+          </label>
+          <input type="text" id="batterSearch" class="form-control"
+                 placeholder="이름 입력 (예: 김도영, 오스틴)" autocomplete="off">
+          <input type="hidden" id="batterName">
+          <div id="batterSuggestions" class="autocomplete-suggestions"></div>
+        </div>
+
+        <!-- 투수 검색 -->
+        <div class="col-md-5 position-relative">
+          <label class="form-label fw-bold">
+            <i class="bi bi-person-fill-gear text-danger"></i> 투수
+          </label>
+          <input type="text" id="pitcherSearch" class="form-control"
+                 placeholder="이름 입력 (예: 류현진, 안우진)" autocomplete="off">
+          <input type="hidden" id="pitcherName">
+          <div id="pitcherSuggestions" class="autocomplete-suggestions"></div>
+        </div>
+
+        <!-- 조회 버튼 -->
+        <div class="col-md-2">
+          <button id="compareBtn" class="btn btn-primary w-100">
+            <i class="bi bi-search"></i> 조회
+          </button>
+        </div>
+      </div>
+
+      <!-- 인기 예제 링크 -->
+      <div class="mt-2 text-muted small">
+        💡 인기 검색:
+        <a href="#" class="example-link text-decoration-none" data-batter="김도영" data-pitcher="류현진">김도영 vs 류현진</a> |
+        <a href="#" class="example-link text-decoration-none" data-batter="오스틴" data-pitcher="최민준">오스틴 vs 최민준</a> |
+        <a href="#" class="example-link text-decoration-none" data-batter="박찬호" data-pitcher="올러">박찬호 vs 올러</a>
+      </div>
+    </div>
+  </div>
+
+  <!-- 결과 영역 -->
+  <div id="matchupResult" class="d-none"></div>
+
+  <!-- 빈 상태 -->
+  <div id="emptyState" class="mt-4 text-center text-muted d-none">
+    <i class="bi bi-search" style="font-size: 3rem; opacity: 0.3;"></i>
+    <p class="mt-2">두 선수가 만난 기록이 없습니다.</p>
+    <p class="small">다른 조합을 시도해보세요. 예제 링크를 클릭하면 빠르게 확인 가능합니다.</p>
+  </div>
+
+  <!-- 초기 안내 -->
+  <div id="initialGuide" class="text-center text-muted py-5">
+    <i class="bi bi-info-circle" style="font-size: 2.5rem;"></i>
+    <p class="mt-2 mb-0">타자와 투수를 선택하면 시즌 매치업 통계와 상세 기록을 볼 수 있습니다.</p>
+  </div>
+</div>
+</th:block>
+
+<th:block th:fragment="matchup-script">
+<script>
+  // ── 선수 자동완성 ──────────────────────────────────────────
+  async function searchPlayer(name, playerType) {
+    if (!name || name.length < 1) return [];
+    try {
+      const res = await fetch(`/api/v1/players?name=${encodeURIComponent(name)}&playerType=${playerType}&size=10`);
+      if (!res.ok) return [];
+      const json = await res.json();
+      return json.data?.content || [];
+    } catch (e) {
+      console.error('검색 실패:', e);
+      return [];
+    }
+  }
+
+  function renderSuggestions(suggestionsEl, players, hiddenInput, visibleInput) {
+    if (players.length === 0) { suggestionsEl.style.display = 'none'; return; }
+    suggestionsEl.innerHTML = players.map(p =>
+      `<div class="autocomplete-suggestion" data-name="${p.name}" data-team="${p.team || ''}">
+         <strong>${p.name}</strong><span class="player-team">${p.team || ''}</span>
+       </div>`
+    ).join('');
+    suggestionsEl.style.display = 'block';
+    suggestionsEl.querySelectorAll('.autocomplete-suggestion').forEach(el => {
+      el.addEventListener('click', () => {
+        visibleInput.value = el.dataset.team
+          ? `${el.dataset.name} (${el.dataset.team})`
+          : el.dataset.name;
+        hiddenInput.value = el.dataset.name;
+        suggestionsEl.style.display = 'none';
+      });
+    });
+  }
+
+  function setupAutocomplete(inputId, hiddenId, suggestionsId, playerType) {
+    const input      = document.getElementById(inputId);
+    const hidden     = document.getElementById(hiddenId);
+    const suggestions = document.getElementById(suggestionsId);
+    let timer;
+
+    input.addEventListener('input', () => {
+      hidden.value = '';
+      clearTimeout(timer);
+      timer = setTimeout(async () => {
+        const q = input.value.trim();
+        if (!q) { suggestions.style.display = 'none'; return; }
+        renderSuggestions(suggestions, await searchPlayer(q, playerType), hidden, input);
+      }, 250);
+    });
+
+    document.addEventListener('click', e => {
+      if (!input.contains(e.target) && !suggestions.contains(e.target))
+        suggestions.style.display = 'none';
+    });
+  }
+
+  setupAutocomplete('batterSearch',  'batterName',  'batterSuggestions',  'BATTER');
+  setupAutocomplete('pitcherSearch', 'pitcherName', 'pitcherSuggestions', 'PITCHER');
+
+  // ── 매치업 조회 ───────────────────────────────────────────
+  async function fetchMatchup() {
+    const batter  = document.getElementById('batterName').value.trim();
+    const pitcher = document.getElementById('pitcherName').value.trim();
+    if (!batter || !pitcher) {
+      alert('타자와 투수를 자동완성 목록에서 선택해주세요.');
+      return;
+    }
+
+    const btn = document.getElementById('compareBtn');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>조회중...';
+
+    try {
+      const res = await fetch(`/api/v1/matchup?batter=${encodeURIComponent(batter)}&pitcher=${encodeURIComponent(pitcher)}`);
+      document.getElementById('initialGuide').classList.add('d-none');
+
+      if (res.status === 404) {
+        document.getElementById('emptyState').classList.remove('d-none');
+        document.getElementById('matchupResult').classList.add('d-none');
+        return;
+      }
+      renderMatchup(await res.json());
+      setTimeout(() => {
+        document.getElementById('matchupResult').scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }, 100);
+    } catch (e) {
+      alert('매치업 조회 실패: ' + e.message);
+    } finally {
+      btn.disabled = false;
+      btn.innerHTML = '<i class="bi bi-search"></i> 조회';
+    }
+  }
+
+  document.getElementById('compareBtn').addEventListener('click', fetchMatchup);
+
+  // 예제 링크
+  document.querySelectorAll('.example-link').forEach(link => {
+    link.addEventListener('click', async e => {
+      e.preventDefault();
+      document.getElementById('batterSearch').value  = link.dataset.batter;
+      document.getElementById('batterName').value    = link.dataset.batter;
+      document.getElementById('pitcherSearch').value = link.dataset.pitcher;
+      document.getElementById('pitcherName').value   = link.dataset.pitcher;
+      await fetchMatchup();
+    });
+  });
+
+  // ── 결과 렌더링 ───────────────────────────────────────────
+  const CAT_LABEL = {
+    HIT:'안타', HOME_RUN:'홈런', WALK:'볼넷', HIT_BY_PITCH:'사구',
+    STRIKEOUT:'삼진', SACRIFICE:'희생타', REACHED_ON_ERROR:'실책', OUT:'아웃', OTHER:'기타'
+  };
+  const CAT_BADGE = {
+    HIT:'bg-success', HOME_RUN:'bg-danger',
+    WALK:'bg-info text-dark', HIT_BY_PITCH:'bg-info text-dark',
+    STRIKEOUT:'bg-warning text-dark', SACRIFICE:'bg-secondary',
+    REACHED_ON_ERROR:'bg-light text-dark border', OUT:'bg-secondary', OTHER:'bg-light text-dark border'
+  };
+
+  const categoryLabel = (cat) => CAT_LABEL[cat] || cat;
+
+  const categoryToColor = (cat) => ({
+    HIT: '#28a745', HOME_RUN: '#dc3545',
+    WALK: '#0dcaf0', HIT_BY_PITCH: '#6610f2',
+    STRIKEOUT: '#ffc107', SACRIFICE: '#6c757d',
+    REACHED_ON_ERROR: '#fd7e14', OUT: '#adb5bd', OTHER: '#dee2e6'
+  }[cat] || '#dee2e6');
+
+  function fmt3(v) { return parseFloat(v).toFixed(3); }
+
+  const renderChart = (records) => {
+    const counts = {};
+    records.forEach(r => {
+      counts[r.resultCategory] = (counts[r.resultCategory] || 0) + 1;
+    });
+
+    const labels = Object.keys(counts).map(c => categoryLabel(c));
+    const data   = Object.values(counts);
+    const colors = Object.keys(counts).map(c => categoryToColor(c));
+
+    const ctx = document.getElementById('resultDistChart');
+    if (window.resultChart) window.resultChart.destroy();
+    window.resultChart = new Chart(ctx, {
+      type: 'doughnut',
+      data: {
+        labels: labels,
+        datasets: [{
+          data: data,
+          backgroundColor: colors,
+          borderWidth: 2,
+          borderColor: '#fff'
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: {
+            position: 'right',
+            labels: { font: { size: 12 } }
+          },
+          tooltip: {
+            callbacks: {
+              label: (ctx) => `${ctx.label}: ${ctx.parsed}건 (${(ctx.parsed / records.length * 100).toFixed(0)}%)`
+            }
+          }
+        }
+      }
+    });
+  };
+
+  const findHighlight = (records) => {
+    const hr = records.find(r => r.resultCategory === 'HOME_RUN');
+    if (hr) return {
+      cssClass: 'text-danger fw-bold',
+      icon: 'bi bi-fire',
+      text: `${hr.gameDate} ${hr.inning}회 홈런!`
+    };
+
+    const extraBase = records.find(r =>
+      r.resultCategory === 'HIT' && (r.result.includes('2') || r.result.includes('3'))
+    );
+    if (extraBase) return {
+      cssClass: 'text-success fw-bold',
+      icon: 'bi bi-star-fill',
+      text: `${extraBase.gameDate} ${extraBase.inning}회 ${extraBase.result}`
+    };
+
+    const hit = records.find(r => r.resultCategory === 'HIT');
+    if (hit) return {
+      cssClass: 'text-success',
+      icon: 'bi bi-check-circle-fill',
+      text: `${hit.gameDate} ${hit.inning}회 안타`
+    };
+
+    const counts = {};
+    records.forEach(r => { counts[r.resultCategory] = (counts[r.resultCategory] || 0) + 1; });
+    const top = Object.entries(counts).sort((a, b) => b[1] - a[1])[0];
+    return {
+      cssClass: 'text-muted',
+      icon: 'bi bi-info-circle',
+      text: `${categoryLabel(top[0])} ${top[1]}회로 가장 많음`
+    };
+  };
+
+  const renderMeta = (data) => {
+    const records   = data.records;
+    const first     = records[0];
+    const last      = records[records.length - 1];
+    const highlight = findHighlight(records);
+    const gameCount = new Set(records.map(r => r.gameDate)).size;
+
+    document.getElementById('matchupMeta').innerHTML = `
+      <div class="row g-3">
+        <div class="col-6">
+          <div class="text-muted small">첫 만남</div>
+          <div class="fw-bold">${first.gameDate}</div>
+          <div class="small">${first.inning}회 — ${first.result}</div>
+        </div>
+        <div class="col-6">
+          <div class="text-muted small">마지막 만남</div>
+          <div class="fw-bold">${last.gameDate}</div>
+          <div class="small">${last.inning}회 — ${last.result}</div>
+        </div>
+        <div class="col-12">
+          <div class="text-muted small">총 ${data.plateAppearances}타석 / ${gameCount}경기</div>
+          <div class="mt-2 ${highlight.cssClass}">
+            <i class="${highlight.icon}"></i> ${highlight.text}
+          </div>
+        </div>
+      </div>`;
+  };
+
+  function renderMatchup(data) {
+    const rows = data.records.map(r => `
+      <tr>
+        <td>${r.gameDate}</td>
+        <td class="text-center">${r.inning}회</td>
+        <td class="text-center text-muted">#${r.atBatOrder}</td>
+        <td><strong>${r.result}</strong></td>
+        <td class="text-center">
+          <span class="badge result-badge ${CAT_BADGE[r.resultCategory] || 'bg-light text-dark'}">
+            ${CAT_LABEL[r.resultCategory] || r.resultCategory}
+          </span>
+        </td>
+      </tr>`).join('');
+
+    document.getElementById('matchupResult').innerHTML = `
+      <div class="card shadow-sm">
+        <div class="card-header bg-primary text-white">
+          <h5 class="mb-0">
+            <i class="bi bi-arrow-left-right"></i>
+            ${data.batterName} <span class="opacity-75 mx-1">vs</span> ${data.pitcherName}
+          </h5>
+        </div>
+        <div class="card-body p-0">
+          <div class="row g-0 text-center">
+            <div class="col-3 col-md stat-card">
+              <div class="stat-label">PA</div>
+              <div class="stat-value">${data.plateAppearances}</div>
+            </div>
+            <div class="col-3 col-md stat-card">
+              <div class="stat-label">AB</div>
+              <div class="stat-value">${data.atBats}</div>
+            </div>
+            <div class="col-3 col-md stat-card">
+              <div class="stat-label">H</div>
+              <div class="stat-value highlight">${data.hits}</div>
+            </div>
+            <div class="col-3 col-md stat-card">
+              <div class="stat-label">HR</div>
+              <div class="stat-value">${data.homeRuns}</div>
+            </div>
+            <div class="col-3 col-md stat-card">
+              <div class="stat-label">BB</div>
+              <div class="stat-value">${data.walks}</div>
+            </div>
+            <div class="col-3 col-md stat-card">
+              <div class="stat-label">K</div>
+              <div class="stat-value">${data.strikeouts}</div>
+            </div>
+            <div class="col-3 col-md stat-card">
+              <div class="stat-label">AVG</div>
+              <div class="stat-value highlight">${fmt3(data.avg)}</div>
+            </div>
+            <div class="col-3 col-md stat-card">
+              <div class="stat-label">OBP</div>
+              <div class="stat-value">${fmt3(data.obp)}</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card-body border-top">
+          <div class="row mb-4">
+            <div class="col-md-5">
+              <div class="card">
+                <div class="card-body">
+                  <h6 class="card-subtitle mb-3 text-muted">
+                    <i class="bi bi-pie-chart"></i> 결과 분포
+                  </h6>
+                  <canvas id="resultDistChart" style="max-height: 250px;"></canvas>
+                </div>
+              </div>
+            </div>
+            <div class="col-md-7 mt-3 mt-md-0">
+              <div class="card h-100">
+                <div class="card-body">
+                  <h6 class="card-subtitle mb-3 text-muted">
+                    <i class="bi bi-clock-history"></i> 매치업 정보
+                  </h6>
+                  <div id="matchupMeta"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card-body border-top pt-0">
+          <h6 class="mb-3">
+            <i class="bi bi-list-ul"></i> 상세 기록
+            <span class="badge bg-secondary ms-1">${data.records.length}건</span>
+          </h6>
+          <div class="table-responsive">
+            <table class="table table-hover table-sm mb-0">
+              <thead class="table-light">
+                <tr>
+                  <th style="width:110px">날짜</th>
+                  <th class="text-center" style="width:60px">이닝</th>
+                  <th class="text-center" style="width:70px">타석</th>
+                  <th>결과</th>
+                  <th class="text-center" style="width:90px">분류</th>
+                </tr>
+              </thead>
+              <tbody>${rows}</tbody>
+            </table>
+          </div>
+        </div>
+      </div>`;
+
+    document.getElementById('matchupResult').classList.remove('d-none');
+    document.getElementById('emptyState').classList.add('d-none');
+
+    renderChart(data.records);
+    renderMeta(data);
+  }
+
+  // 페이지 진입 시 타자 입력 포커스
+  window.addEventListener('load', () => {
+    document.getElementById('batterSearch').focus();
+  });
+</script>
+</th:block>
+
+</body>
+</html>

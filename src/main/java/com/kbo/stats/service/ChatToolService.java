@@ -6,6 +6,8 @@ import com.kbo.stats.domain.Game;
 import com.kbo.stats.domain.Player;
 import com.kbo.stats.domain.PlayerType;
 import com.kbo.stats.dto.ChatResponseDto;
+import com.kbo.stats.dto.MatchupSummaryDto;
+import com.kbo.stats.dto.PlayerMatchupListDto;
 import com.kbo.stats.dto.PlayerSearchDto;
 import com.kbo.stats.dto.PlayerVsTeamDto;
 import com.kbo.stats.mapper.PlayerMapper;
@@ -31,13 +33,15 @@ public class ChatToolService {
     private final DashboardService dashboardService;
     private final GameDetailService gameDetailService;
     private final PlayerService playerService;
+    private final MatchupService matchupService;
 
     private static final String SYSTEM_PROMPT = "당신은 KBO 리그 통계 전문 어시스턴트입니다. " +
             "현재는 2026년 KBO 시즌입니다. 연도가 명시되지 않은 날짜는 모두 2026년으로 가정하세요. " + // ← 추가
             "사용자가 선수 통계, 상대 팀 전적 등을 물어보면 제공된 도구를 사용해 데이터를 조회한 뒤 자연스러운 한국어로 답변하세요. " +
             "데이터를 모르거나 도구가 없는 영역의 질문은 정직하게 모른다고 답하세요. " +
             "수치는 정확히 인용하고, 불필요한 부연 설명은 피하세요. " +
-            "날짜는 YYYY-MM-DD 형식으로 받고, 팀 이름은 한글(KIA, KT, LG, NC, SSG, 두산, 롯데, 삼성, 키움, 한화) 그대로 사용하세요.";
+            "날짜는 YYYY-MM-DD 형식으로 받고, 팀 이름은 한글(KIA, KT, LG, NC, SSG, 두산, 롯데, 삼성, 키움, 한화) 그대로 사용하세요. " +
+            "타자-투수 1:1 매치업 데이터도 조회 가능합니다. 박스스코어 데이터에서 추론한 결과로, 박스스코어가 없는 경기는 매치업이 없을 수 있습니다.";
 
     private static final int MAX_TURNS = 5;
 
@@ -108,7 +112,26 @@ public class ChatToolService {
                                             "description",
                                             "통계 부문: battingAvg, homeRuns, rbi, stolenBases, era, wins, saves, holds"),
                                     "limit", Map.of("type", "integer", "description", "조회 인원 수 (기본 5, 최대 20)")),
-                            "required", List.of("statName"))));
+                            "required", List.of("statName"))),
+            Map.of(
+                    "name", "getMatchup",
+                    "description", "특정 타자 vs 특정 투수의 1:1 매치업 기록을 조회합니다. 타석 수, 안타, 홈런, 볼넷, 삼진, 타율 등을 포함합니다.",
+                    "input_schema", Map.of(
+                            "type", "object",
+                            "properties", Map.of(
+                                    "batter", Map.of("type", "string", "description", "타자 이름"),
+                                    "pitcher", Map.of("type", "string", "description", "투수 이름")),
+                            "required", List.of("batter", "pitcher"))),
+            Map.of(
+                    "name", "getPlayerMatchups",
+                    "description", "특정 선수가 시즌 동안 만난 모든 상대 선수의 매치업 요약을 조회합니다. 타자면 모든 상대 투수, 투수면 모든 상대 타자.",
+                    "input_schema", Map.of(
+                            "type", "object",
+                            "properties", Map.of(
+                                    "playerName", Map.of("type", "string", "description", "선수 이름"),
+                                    "playerType", Map.of("type", "string",
+                                            "description", "'BATTER' or 'PITCHER'. 미지정 시 자동 판별.")),
+                            "required", List.of("playerName"))));
 
     @Cacheable(value = "chatAnswers", key = "'v2:' + #question.toLowerCase().trim()")
     public ChatResponseDto answer(String question) {
@@ -239,6 +262,74 @@ public class ChatToolService {
                             ? input.path("limit").asInt()
                             : null;
                     yield getStatRanking(statName, limit);
+                }
+                case "getMatchup" -> {
+                    String batter = input.path("batter").asText();
+                    String pitcher = input.path("pitcher").asText();
+                    MatchupSummaryDto matchupResult = matchupService.getMatchup(batter, pitcher);
+                    if (matchupResult.getPlateAppearances() == 0) {
+                        yield "{\"error\":\"" + batter + " vs " + pitcher + " 매치업 기록 없음\"}";
+                    }
+                    Map<String, Object> trimmed = new LinkedHashMap<>();
+                    trimmed.put("batter", matchupResult.getBatterName());
+                    trimmed.put("pitcher", matchupResult.getPitcherName());
+                    trimmed.put("plateAppearances", matchupResult.getPlateAppearances());
+                    trimmed.put("atBats", matchupResult.getAtBats());
+                    trimmed.put("hits", matchupResult.getHits());
+                    trimmed.put("homeRuns", matchupResult.getHomeRuns());
+                    trimmed.put("walks", matchupResult.getWalks());
+                    trimmed.put("strikeouts", matchupResult.getStrikeouts());
+                    trimmed.put("avg", matchupResult.getAvg());
+                    trimmed.put("obp", matchupResult.getObp());
+                    trimmed.put("records", matchupResult.getRecords().stream()
+                            .limit(10)
+                            .map(r -> Map.of(
+                                    "gameDate", r.getGameDate().toString(),
+                                    "inning", r.getInning(),
+                                    "result", r.getResult(),
+                                    "category", r.getResultCategory()))
+                            .toList());
+                    yield objectMapper.writeValueAsString(trimmed);
+                }
+                case "getPlayerMatchups" -> {
+                    String name = input.path("playerName").asText();
+                    String type = input.has("playerType") && !input.path("playerType").isNull()
+                            && !input.path("playerType").asText().isBlank()
+                                    ? input.path("playerType").asText() : null;
+                    if (type == null) {
+                        PlayerSearchDto s = new PlayerSearchDto();
+                        s.setName(name);
+                        s.setSize(1);
+                        List<Player> found = playerMapper.findAll(s);
+                        if (found.isEmpty()) {
+                            yield "{\"error\":\"" + name + " 선수를 찾을 수 없습니다.\"}";
+                        }
+                        type = found.get(0).getPlayerType().name();
+                    }
+                    PlayerMatchupListDto listResult = "BATTER".equals(type)
+                            ? matchupService.getBatterMatchups(name)
+                            : matchupService.getPitcherMatchups(name);
+                    if (listResult.getMatchups().isEmpty()) {
+                        yield "{\"error\":\"" + name + " 매치업 기록 없음\"}";
+                    }
+                    Map<String, Object> trimmed = new LinkedHashMap<>();
+                    trimmed.put("playerName", listResult.getPlayerName());
+                    trimmed.put("playerType", listResult.getPlayerType());
+                    trimmed.put("totalOpponents", listResult.getMatchups().size());
+                    trimmed.put("topMatchups", listResult.getMatchups().stream()
+                            .limit(15)
+                            .map(m -> Map.of(
+                                    "batter", m.getBatterName(),
+                                    "pitcher", m.getPitcherName(),
+                                    "plateAppearances", m.getPlateAppearances(),
+                                    "atBats", m.getAtBats(),
+                                    "hits", m.getHits(),
+                                    "homeRuns", m.getHomeRuns(),
+                                    "walks", m.getWalks(),
+                                    "strikeouts", m.getStrikeouts(),
+                                    "avg", m.getAvg()))
+                            .toList());
+                    yield objectMapper.writeValueAsString(trimmed);
                 }
                 default -> "{\"error\":\"알 수 없는 도구: " + toolName + "\"}";
             };

@@ -50,6 +50,8 @@ public class SecurityConfig {
                                                 .permitAll()
                                                 // 대시보드 API - 전체 공개
                                                 .requestMatchers("/api/v1/dashboard/**").permitAll()
+                                                // 매치업 API - 전체 공개
+                                                .requestMatchers("/api/v1/matchup/**").permitAll()
 
                                                 // ── 회원 전용 경로 ──
                                                 .requestMatchers("/my/**").hasAnyRole("USER", "ADMIN")
