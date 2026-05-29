@@ -41,7 +41,8 @@ public class ChatToolService {
             "데이터를 모르거나 도구가 없는 영역의 질문은 정직하게 모른다고 답하세요. " +
             "수치는 정확히 인용하고, 불필요한 부연 설명은 피하세요. " +
             "날짜는 YYYY-MM-DD 형식으로 받고, 팀 이름은 한글(KIA, KT, LG, NC, SSG, 두산, 롯데, 삼성, 키움, 한화) 그대로 사용하세요. " +
-            "타자-투수 1:1 매치업 데이터도 조회 가능합니다. 박스스코어 데이터에서 추론한 결과로, 박스스코어가 없는 경기는 매치업이 없을 수 있습니다.";
+            "타자-투수 1:1 매치업 데이터도 조회 가능합니다. 박스스코어 데이터에서 추론한 결과로, 박스스코어가 없는 경기는 매치업이 없을 수 있습니다. " +
+            "동명이인이 발견되면 warning_batter 또는 warning_pitcher 필드가 응답에 포함되며, 결과는 모든 동명이인 합산임을 사용자에게 알려주세요.";
 
     private static final int MAX_TURNS = 5;
 
@@ -266,11 +267,35 @@ public class ChatToolService {
                 case "getMatchup" -> {
                     String batter = input.path("batter").asText();
                     String pitcher = input.path("pitcher").asText();
+
+                    // 동명이인 체크
+                    PlayerSearchDto bs = new PlayerSearchDto();
+                    bs.setName(batter); bs.setSize(10);
+                    List<Player> batters = playerMapper.findAll(bs);
+                    PlayerSearchDto ps = new PlayerSearchDto();
+                    ps.setName(pitcher); ps.setSize(10);
+                    List<Player> pitchers = playerMapper.findAll(ps);
+
+                    Map<String, Object> trimmed = new LinkedHashMap<>();
+                    if (batters.size() > 1) {
+                        trimmed.put("warning_batter", batter + " 동명이인 " + batters.size() + "명 - "
+                                + batters.stream()
+                                    .map(p -> p.getName() + "(" + p.getTeam() + ")")
+                                    .collect(Collectors.joining(", "))
+                                + ". 결과는 모두 합산됨.");
+                    }
+                    if (pitchers.size() > 1) {
+                        trimmed.put("warning_pitcher", pitcher + " 동명이인 " + pitchers.size() + "명 - "
+                                + pitchers.stream()
+                                    .map(p -> p.getName() + "(" + p.getTeam() + ")")
+                                    .collect(Collectors.joining(", "))
+                                + ". 결과는 모두 합산됨.");
+                    }
+
                     MatchupSummaryDto matchupResult = matchupService.getMatchup(batter, pitcher);
                     if (matchupResult.getPlateAppearances() == 0) {
                         yield "{\"error\":\"" + batter + " vs " + pitcher + " 매치업 기록 없음\"}";
                     }
-                    Map<String, Object> trimmed = new LinkedHashMap<>();
                     trimmed.put("batter", matchupResult.getBatterName());
                     trimmed.put("pitcher", matchupResult.getPitcherName());
                     trimmed.put("plateAppearances", matchupResult.getPlateAppearances());

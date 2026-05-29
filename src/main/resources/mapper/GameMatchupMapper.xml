@@ -78,4 +78,30 @@
         ORDER BY g.game_date, gm.at_bat_order
     </select>
 
+    <!-- player_id 기반 조회 (동명이인 정확 분리) -->
+    <select id="findByBatterIdAndPitcherId" resultType="com.kbo.stats.dto.MatchupRecordRow">
+        SELECT <include refid="matchupRecordColumns"/>
+        FROM game_matchup gm
+        JOIN game g ON g.id = gm.game_id
+        WHERE gm.batter_player_id = #{batterId}
+          AND gm.pitcher_player_id = #{pitcherId}
+        ORDER BY g.game_date, gm.at_bat_order
+    </select>
+
+    <select id="findByBatterId" resultType="com.kbo.stats.dto.MatchupRecordRow">
+        SELECT <include refid="matchupRecordColumns"/>
+        FROM game_matchup gm
+        JOIN game g ON g.id = gm.game_id
+        WHERE gm.batter_player_id = #{batterId}
+        ORDER BY g.game_date, gm.at_bat_order
+    </select>
+
+    <select id="findByPitcherId" resultType="com.kbo.stats.dto.MatchupRecordRow">
+        SELECT <include refid="matchupRecordColumns"/>
+        FROM game_matchup gm
+        JOIN game g ON g.id = gm.game_id
+        WHERE gm.pitcher_player_id = #{pitcherId}
+        ORDER BY g.game_date, gm.at_bat_order
+    </select>
+
 </mapper>

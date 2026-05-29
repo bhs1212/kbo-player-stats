@@ -1,8 +1,10 @@
 package com.kbo.stats.service;
 
 import com.kbo.stats.domain.MatchupResultCategory;
+import com.kbo.stats.domain.Player;
 import com.kbo.stats.dto.*;
 import com.kbo.stats.mapper.GameMatchupMapper;
+import com.kbo.stats.mapper.PlayerMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.cache.annotation.Cacheable;
@@ -19,6 +21,7 @@ import java.util.stream.Collectors;
 public class MatchupService {
 
     private final GameMatchupMapper matchupMapper;
+    private final PlayerMapper playerMapper;
 
     @Cacheable(value = "matchup", key = "#batterName + ':' + #pitcherName")
     public MatchupSummaryDto getMatchup(String batterName, String pitcherName) {
@@ -39,6 +42,50 @@ public class MatchupService {
         return PlayerMatchupListDto.builder()
                 .playerName(batterName)
                 .playerType("BATTER")
+                .matchups(summaries)
+                .build();
+    }
+
+    // ── player_id 기반 조회 (동명이인 정확 분리) ─────────────────
+
+    @Cacheable(value = "matchup", key = "'id:' + #batterId + ':' + #pitcherId")
+    public MatchupSummaryDto getMatchupByIds(Long batterId, Long pitcherId) {
+        List<MatchupRecordRow> rows = matchupMapper.findByBatterIdAndPitcherId(batterId, pitcherId);
+        String batterName  = playerMapper.findById(batterId).map(Player::getName).orElse("(unknown)");
+        String pitcherName = playerMapper.findById(pitcherId).map(Player::getName).orElse("(unknown)");
+        return aggregate(batterName, pitcherName, rows);
+    }
+
+    public PlayerMatchupListDto getBatterMatchupsById(Long batterId) {
+        Player batter = playerMapper.findById(batterId)
+                .orElseThrow(() -> new IllegalArgumentException("선수 미존재: " + batterId));
+        List<MatchupRecordRow> rows = matchupMapper.findByBatterId(batterId);
+        List<MatchupSummaryDto> summaries = rows.stream()
+                .collect(Collectors.groupingBy(MatchupRecordRow::getPitcherName, LinkedHashMap::new, Collectors.toList()))
+                .entrySet().stream()
+                .map(e -> aggregate(batter.getName(), e.getKey(), e.getValue()))
+                .sorted(Comparator.comparing(MatchupSummaryDto::getPlateAppearances).reversed())
+                .collect(Collectors.toList());
+        return PlayerMatchupListDto.builder()
+                .playerName(batter.getName())
+                .playerType("BATTER")
+                .matchups(summaries)
+                .build();
+    }
+
+    public PlayerMatchupListDto getPitcherMatchupsById(Long pitcherId) {
+        Player pitcher = playerMapper.findById(pitcherId)
+                .orElseThrow(() -> new IllegalArgumentException("선수 미존재: " + pitcherId));
+        List<MatchupRecordRow> rows = matchupMapper.findByPitcherId(pitcherId);
+        List<MatchupSummaryDto> summaries = rows.stream()
+                .collect(Collectors.groupingBy(MatchupRecordRow::getBatterName, LinkedHashMap::new, Collectors.toList()))
+                .entrySet().stream()
+                .map(e -> aggregate(e.getKey(), pitcher.getName(), e.getValue()))
+                .sorted(Comparator.comparing(MatchupSummaryDto::getPlateAppearances).reversed())
+                .collect(Collectors.toList());
+        return PlayerMatchupListDto.builder()
+                .playerName(pitcher.getName())
+                .playerType("PITCHER")
                 .matchups(summaries)
                 .build();
     }

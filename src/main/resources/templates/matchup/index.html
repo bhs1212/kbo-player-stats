@@ -165,7 +165,7 @@
   function renderSuggestions(suggestionsEl, players, hiddenInput, visibleInput) {
     if (players.length === 0) { suggestionsEl.style.display = 'none'; return; }
     suggestionsEl.innerHTML = players.map(p =>
-      `<div class="autocomplete-suggestion" data-name="${p.name}" data-team="${p.team || ''}">
+      `<div class="autocomplete-suggestion" data-id="${p.id}" data-name="${p.name}" data-team="${p.team || ''}">
          <strong>${p.name}</strong><span class="player-team">${p.team || ''}</span>
        </div>`
     ).join('');
@@ -176,6 +176,7 @@
           ? `${el.dataset.name} (${el.dataset.team})`
           : el.dataset.name;
         hiddenInput.value = el.dataset.name;
+        hiddenInput.dataset.playerId = el.dataset.id;
         suggestionsEl.style.display = 'none';
       });
     });
@@ -188,7 +189,8 @@
     let timer;
 
     input.addEventListener('input', () => {
-      hidden.value = '';
+      hidden.value = input.value.trim();
+      hidden.dataset.playerId = '';
       clearTimeout(timer);
       timer = setTimeout(async () => {
         const q = input.value.trim();
@@ -208,11 +210,23 @@
 
   // ── 매치업 조회 ───────────────────────────────────────────
   async function fetchMatchup() {
-    const batter  = document.getElementById('batterName').value.trim();
-    const pitcher = document.getElementById('pitcherName').value.trim();
-    if (!batter || !pitcher) {
-      alert('타자와 투수를 자동완성 목록에서 선택해주세요.');
+    const batterEl  = document.getElementById('batterName');
+    const pitcherEl = document.getElementById('pitcherName');
+    const batterName  = batterEl.value.trim();
+    const pitcherName = pitcherEl.value.trim();
+    const batterId    = batterEl.dataset.playerId;
+    const pitcherId   = pitcherEl.dataset.playerId;
+
+    if (!batterName || !pitcherName) {
+      alert('타자와 투수 이름을 입력해주세요.');
       return;
+    }
+
+    let url = '/api/v1/matchup?';
+    if (batterId && pitcherId) {
+      url += `batterId=${batterId}&pitcherId=${pitcherId}`;
+    } else {
+      url += `batter=${encodeURIComponent(batterName)}&pitcher=${encodeURIComponent(pitcherName)}`;
     }
 
     const btn = document.getElementById('compareBtn');
@@ -220,7 +234,7 @@
     btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>조회중...';
 
     try {
-      const res = await fetch(`/api/v1/matchup?batter=${encodeURIComponent(batter)}&pitcher=${encodeURIComponent(pitcher)}`);
+      const res = await fetch(url);
       document.getElementById('initialGuide').classList.add('d-none');
 
       if (res.status === 404) {
