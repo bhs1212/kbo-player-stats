@@ -48,8 +48,9 @@ public interface PlayerMapper {
     void updateSavesAndHolds(@Param("name") String name, @Param("team") String team,
                               @Param("saves") Integer saves, @Param("holds") Integer holds);
 
-    // 타율 랭킹 (타자)
-    List<Player> findBattingRanking(@Param("limit") int limit);
+    // 타율 랭킹 (타자, 규정타석 이상)
+    List<Player> findBattingRanking(@Param("requiredAB") int requiredAB,
+                                    @Param("limit") int limit);
 
     // 홈런 랭킹 (타자)
     List<Player> findHomeRunRanking(@Param("limit") int limit);
@@ -60,8 +61,9 @@ public interface PlayerMapper {
     // 도루 랭킹 (타자)
     List<Player> findStolenBasesRanking(@Param("limit") int limit);
 
-    // 방어율 랭킹 (투수)
-    List<Player> findEraRanking(@Param("limit") int limit);
+    // 방어율 랭킹 (투수, 규정이닝 이상)
+    List<Player> findEraRanking(@Param("requiredOuts") int requiredOuts,
+                                @Param("limit") int limit);
 
     // 승리 랭킹 (투수)
     List<Player> findWinsRanking(@Param("limit") int limit);

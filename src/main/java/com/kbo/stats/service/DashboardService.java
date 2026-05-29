@@ -24,6 +24,7 @@ public class DashboardService {
 
     private final GameMapper gameMapper;
     private final PlayerMapper playerMapper;
+    private final PlayerService playerService;
 
     /** 팀 순위 목록 (승률 기준 정렬, 5분 캐싱) */
     @Cacheable("teamStandings")
@@ -56,11 +57,11 @@ public class DashboardService {
         log.info("시즌 랭킹 조회 시작 (캐시 미스): type={}, limit={}", type, limit);
         try {
             List<Player> result = switch (type) {
-                case "batting" -> playerMapper.findBattingRanking(limit);
-                case "homerun" -> playerMapper.findHomeRunRanking(limit);
-                case "era"     -> playerMapper.findEraRanking(limit);
-                case "wins"    -> playerMapper.findWinsRanking(limit);
-                default        -> List.of();
+                case "batting" -> playerService.getBattingRanking(limit);
+                case "homerun" -> playerService.getHomeRunRanking(limit);
+                case "era" -> playerService.getEraRanking(limit);
+                case "wins" -> playerService.getWinsRanking(limit);
+                default -> List.of();
             };
             log.info("시즌 랭킹 조회 완료: type={}, 결과={}명", type, result.size());
             return result;

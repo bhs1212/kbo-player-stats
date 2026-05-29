@@ -38,6 +38,7 @@
             GROUP BY ev.player_name, team
         ) hr_agg ON hr_agg.player_name = p.name AND hr_agg.team = p.team
         SET
+            p.at_bats     = batter_agg.ab,
             p.hits        = batter_agg.h,
             p.rbi         = batter_agg.rbi,
             p.games       = batter_agg.games,
@@ -72,6 +73,7 @@
             GROUP BY gpl.player_name, team
         ) agg ON p.name = agg.name AND p.team = agg.team
         SET
+            p.innings_pitched_outs = agg.total_outs,
             p.wins  = agg.wins,
             p.saves = agg.saves,
             p.holds = agg.holds,

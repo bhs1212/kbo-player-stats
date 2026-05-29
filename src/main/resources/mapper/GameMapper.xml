@@ -132,6 +132,20 @@
         SELECT id FROM game WHERE status = #{status} ORDER BY game_date, id
     </select>
 
+    <!-- 팀별 평균 완료 경기수 (규정타석/이닝 기준값 계산용) -->
+    <select id="getAverageTeamGameCount" resultType="int">
+        SELECT FLOOR(AVG(team_game_count))
+        FROM (
+            SELECT COUNT(*) AS team_game_count
+            FROM (
+                SELECT id, away_team AS team FROM game WHERE status = 'FINISHED'
+                UNION ALL
+                SELECT id, home_team AS team FROM game WHERE status = 'FINISHED'
+            ) t
+            GROUP BY team
+        ) avg_games
+    </select>
+
     <!-- 경기 등록/업데이트 (날짜+팀 UNIQUE KEY 중복 시 점수·상태 갱신) -->
     <insert id="upsert" parameterType="com.kbo.stats.domain.Game">
         INSERT INTO game (game_date, game_time, away_team, home_team,

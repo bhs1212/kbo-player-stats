@@ -23,11 +23,13 @@ public class Player {
     private Double battingAvg;
     private Integer homeRuns;
     private Integer hits;
+    private Integer atBats;          // 타수 (규정타석 판단용, sync 시 채워짐)
     private Integer rbi;
     private Integer stolenBases;
 
     // 투수 기록
     private Double era;
+    private Integer inningsPitchedOuts;  // 아웃카운트 정수 (규정이닝 판단용, sync 시 채워짐)
     private Integer wins;
     private Integer saves;
     private Integer holds;

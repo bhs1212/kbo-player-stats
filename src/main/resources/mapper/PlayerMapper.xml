@@ -11,24 +11,26 @@
         <result property="position"   column="position"/>
         <result property="playerType" column="player_type"
                 typeHandler="org.apache.ibatis.type.EnumTypeHandler"/>
-        <result property="battingAvg"   column="batting_avg"/>
-        <result property="homeRuns"    column="home_runs"/>
-        <result property="hits"        column="hits"/>
-        <result property="rbi"         column="rbi"/>
-        <result property="stolenBases" column="stolen_bases"/>
-        <result property="era"         column="era"/>
-        <result property="wins"        column="wins"/>
-        <result property="saves"       column="saves"/>
-        <result property="holds"       column="holds"/>
-        <result property="games"       column="games"/>
+        <result property="battingAvg"        column="batting_avg"/>
+        <result property="homeRuns"          column="home_runs"/>
+        <result property="hits"              column="hits"/>
+        <result property="atBats"            column="at_bats"/>
+        <result property="rbi"               column="rbi"/>
+        <result property="stolenBases"       column="stolen_bases"/>
+        <result property="era"               column="era"/>
+        <result property="inningsPitchedOuts" column="innings_pitched_outs"/>
+        <result property="wins"              column="wins"/>
+        <result property="saves"             column="saves"/>
+        <result property="holds"             column="holds"/>
+        <result property="games"             column="games"/>
         <result property="createdAt"  column="created_at"/>
         <result property="updatedAt"  column="updated_at"/>
     </resultMap>
 
     <sql id="selectColumns">
         id, name, team, position, player_type,
-        batting_avg, home_runs, hits, rbi, stolen_bases,
-        era, wins, saves, holds, games,
+        batting_avg, home_runs, hits, at_bats, rbi, stolen_bases,
+        era, innings_pitched_outs, wins, saves, holds, games,
         created_at, updated_at
     </sql>
 
@@ -155,14 +157,14 @@
         DELETE FROM player
     </delete>
 
-    <!-- 타율 랭킹 -->
+    <!-- 타율 랭킹 (규정타석 이상) -->
     <select id="findBattingRanking" resultMap="PlayerResultMap">
         SELECT <include refid="selectColumns"/>
         FROM player
         WHERE player_type = 'BATTER'
+          AND at_bats >= #{requiredAB}
           AND batting_avg IS NOT NULL
-          AND games >= 10
-        ORDER BY batting_avg DESC
+        ORDER BY batting_avg DESC, hits DESC
         LIMIT #{limit}
     </select>
 
@@ -186,14 +188,14 @@
         LIMIT #{limit}
     </select>
 
-    <!-- 방어율 랭킹 -->
+    <!-- 방어율 랭킹 (규정이닝 이상) -->
     <select id="findEraRanking" resultMap="PlayerResultMap">
         SELECT <include refid="selectColumns"/>
         FROM player
         WHERE player_type = 'PITCHER'
+          AND innings_pitched_outs >= #{requiredOuts}
           AND era IS NOT NULL
-          AND games >= 5
-        ORDER BY era ASC
+        ORDER BY era ASC, wins DESC
         LIMIT #{limit}
     </select>
 

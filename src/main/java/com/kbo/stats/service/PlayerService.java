@@ -6,6 +6,7 @@ import com.kbo.stats.dto.PageDto;
 import com.kbo.stats.dto.PlayerFormDto;
 import com.kbo.stats.dto.PlayerSearchDto;
 import com.kbo.stats.dto.TeamStatDto;
+import com.kbo.stats.mapper.GameMapper;
 import com.kbo.stats.mapper.PlayerMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -21,6 +22,7 @@ import java.util.List;
 public class PlayerService {
 
     private final PlayerMapper playerMapper;
+    private final GameMapper   gameMapper;
 
     public PageDto<Player> search(PlayerSearchDto searchDto) {
         List<Player> content = playerMapper.findAll(searchDto);
@@ -91,7 +93,9 @@ public class PlayerService {
 
     // 랭킹
     public List<Player> getBattingRanking(int limit) {
-        return playerMapper.findBattingRanking(limit);
+        int teamGames  = gameMapper.getAverageTeamGameCount();
+        int requiredAB = (int) (teamGames * 3.1);
+        return playerMapper.findBattingRanking(requiredAB, limit);
     }
 
     public List<Player> getHomeRunRanking(int limit) {
@@ -107,7 +111,9 @@ public class PlayerService {
     }
 
     public List<Player> getEraRanking(int limit) {
-        return playerMapper.findEraRanking(limit);
+        int teamGames    = gameMapper.getAverageTeamGameCount();
+        int requiredOuts = teamGames * 3;
+        return playerMapper.findEraRanking(requiredOuts, limit);
     }
 
     public List<Player> getWinsRanking(int limit) {
