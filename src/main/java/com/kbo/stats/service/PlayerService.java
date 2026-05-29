@@ -145,4 +145,25 @@ public class PlayerService {
                         () -> playerMapper.insert(player)
                 );
     }
+
+    // 박스스코어 매치업 적재 시 사용: 없으면 stub 자동 생성
+    @Transactional
+    public Long findOrCreateStubId(String name, String team, String playerType) {
+        return playerMapper.findByNameAndTeam(name, team)
+                .map(Player::getId)
+                .orElseGet(() -> createStub(name, team, playerType));
+    }
+
+    private Long createStub(String name, String team, String playerType) {
+        Player stub = Player.builder()
+                .name(name)
+                .team(team)
+                .position("PITCHER".equals(playerType) ? "투수" : "타자")
+                .playerType(PlayerType.valueOf(playerType))
+                .build();
+        playerMapper.insert(stub);
+        log.info("[Player Stub] 자동 생성: name={} team={} type={} id={}",
+                name, team, playerType, stub.getId());
+        return stub.getId();
+    }
 }

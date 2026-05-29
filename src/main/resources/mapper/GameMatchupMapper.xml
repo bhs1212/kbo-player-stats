@@ -11,8 +11,10 @@
         <result property="atBatOrder"         column="at_bat_order"/>
         <result property="batterTeamSide"     column="batter_team_side"/>
         <result property="batterName"         column="batter_name"/>
+        <result property="batterPlayerId"     column="batter_player_id"/>
         <result property="batterBattingOrder" column="batter_batting_order"/>
         <result property="pitcherName"        column="pitcher_name"/>
+        <result property="pitcherPlayerId"    column="pitcher_player_id"/>
         <result property="pitcherPitchOrder"  column="pitcher_pitch_order"/>
         <result property="result"             column="result"/>
         <result property="createdAt"          column="created_at"/>
@@ -20,13 +22,14 @@
 
     <insert id="insertBatch">
         INSERT INTO game_matchup
-            (game_id, inning, at_bat_order, batter_team_side, batter_name,
-             batter_batting_order, pitcher_name, pitcher_pitch_order, result)
+            (game_id, inning, at_bat_order,
+             batter_team_side, batter_name, batter_player_id, batter_batting_order,
+             pitcher_name, pitcher_player_id, pitcher_pitch_order, result)
         VALUES
         <foreach collection="matchups" item="m" separator=",">
-            (#{m.gameId}, #{m.inning}, #{m.atBatOrder}, #{m.batterTeamSide},
-             #{m.batterName}, #{m.batterBattingOrder}, #{m.pitcherName},
-             #{m.pitcherPitchOrder}, #{m.result})
+            (#{m.gameId}, #{m.inning}, #{m.atBatOrder},
+             #{m.batterTeamSide}, #{m.batterName}, #{m.batterPlayerId}, #{m.batterBattingOrder},
+             #{m.pitcherName}, #{m.pitcherPlayerId}, #{m.pitcherPitchOrder}, #{m.result})
         </foreach>
     </insert>
 

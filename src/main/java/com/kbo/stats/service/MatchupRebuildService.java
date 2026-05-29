@@ -1,6 +1,7 @@
 package com.kbo.stats.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.kbo.stats.domain.Game;
 import com.kbo.stats.domain.GameBatterLog;
 import com.kbo.stats.domain.GameMatchup;
 import com.kbo.stats.domain.GamePitcherLog;
@@ -28,6 +29,7 @@ public class MatchupRebuildService {
     private final GamePitcherLogMapper pitcherLogMapper;
     private final GameMatchupMapper matchupMapper;
     private final GameMapper gameMapper;
+    private final PlayerService playerService;
     private final ObjectMapper objectMapper;
 
     /**
@@ -78,14 +80,17 @@ public class MatchupRebuildService {
 
         matchupMapper.deleteByGameId(gameId);
 
+        Game game = gameMapper.findById(gameId)
+                .orElseThrow(() -> new IllegalArgumentException("게임 미존재: " + gameId));
+
         List<GameBatterLog>  awayBatters  = batterLogMapper.findByGameIdAndTeamSide(gameId, "AWAY");
         List<GameBatterLog>  homeBatters  = batterLogMapper.findByGameIdAndTeamSide(gameId, "HOME");
         List<GamePitcherLog> awayPitchers = pitcherLogMapper.findByGameIdAndTeamSide(gameId, "AWAY");
         List<GamePitcherLog> homePitchers = pitcherLogMapper.findByGameIdAndTeamSide(gameId, "HOME");
 
         List<GameMatchup> matchups = new ArrayList<>();
-        matchups.addAll(buildMatchups(gameId, awayBatters, homePitchers, "AWAY"));
-        matchups.addAll(buildMatchups(gameId, homeBatters, awayPitchers, "HOME"));
+        matchups.addAll(buildMatchups(gameId, game, awayBatters, homePitchers, "AWAY"));
+        matchups.addAll(buildMatchups(gameId, game, homeBatters, awayPitchers, "HOME"));
 
         if (!matchups.isEmpty()) {
             matchupMapper.insertBatch(matchups);
@@ -96,6 +101,7 @@ public class MatchupRebuildService {
 
     private List<GameMatchup> buildMatchups(
             Long gameId,
+            Game game,
             List<GameBatterLog> batters,
             List<GamePitcherLog> pitchers,
             String batterTeamSide) {
@@ -170,6 +176,12 @@ public class MatchupRebuildService {
         }
 
         // ③ 시퀀스 + 투수 range 매칭
+        String batterTeam  = "AWAY".equals(batterTeamSide) ? game.getAwayTeam() : game.getHomeTeam();
+        String pitcherTeam = "AWAY".equals(batterTeamSide) ? game.getHomeTeam() : game.getAwayTeam();
+
+        // 게임 단위 player_id 캐시 (중복 쿼리 방지)
+        Map<String, Long> playerIdCache = new HashMap<>();
+
         List<GameMatchup> result = new ArrayList<>();
         for (int i = 0; i < sequence.size(); i++) {
             int atBatOrder = i + 1;
@@ -185,14 +197,24 @@ public class MatchupRebuildService {
                 continue;
             }
 
+            String batterKey  = c.batter.getPlayerName() + "|" + batterTeam;
+            String pitcherKey = pitcher.name + "|" + pitcherTeam;
+
+            Long batterPlayerId = playerIdCache.computeIfAbsent(batterKey, k ->
+                    playerService.findOrCreateStubId(c.batter.getPlayerName(), batterTeam, "BATTER"));
+            Long pitcherPlayerId = playerIdCache.computeIfAbsent(pitcherKey, k ->
+                    playerService.findOrCreateStubId(pitcher.name, pitcherTeam, "PITCHER"));
+
             result.add(GameMatchup.builder()
                     .gameId(gameId)
                     .inning(c.inning)
                     .atBatOrder(atBatOrder)
                     .batterTeamSide(batterTeamSide)
                     .batterName(c.batter.getPlayerName())
+                    .batterPlayerId(batterPlayerId)
                     .batterBattingOrder(c.battingOrder)
                     .pitcherName(pitcher.name)
+                    .pitcherPlayerId(pitcherPlayerId)
                     .pitcherPitchOrder(pitcher.pitchOrder)
                     .result(c.result)
                     .build());

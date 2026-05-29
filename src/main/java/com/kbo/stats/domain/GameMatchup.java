@@ -18,8 +18,10 @@ public class GameMatchup {
     private Integer atBatOrder;
     private String batterTeamSide;
     private String batterName;
+    private Long batterPlayerId;
     private Integer batterBattingOrder;
     private String pitcherName;
+    private Long pitcherPlayerId;
     private Integer pitcherPitchOrder;
     private String result;
     private LocalDateTime createdAt;
