@@ -32,6 +32,8 @@ public class SecurityConfig {
                                                                 new AntPathRequestMatcher("/crawling/cross-validation",
                                                                                 "POST"),
                                                                 new AntPathRequestMatcher("/crawling/matchup-rebuild**",
+                                                                                "POST"),
+                                                                new AntPathRequestMatcher("/crawling/sync-player-stats",
                                                                                 "POST")))
                                 .authorizeHttpRequests(auth -> auth
                                                 // ── 정적 리소스 및 공개 고정 경로 ──
@@ -88,6 +90,11 @@ public class SecurityConfig {
                                                 // 타자-투수 매치업 재구성
                                                 .requestMatchers(
                                                                 new AntPathRequestMatcher("/crawling/matchup-rebuild**",
+                                                                                "POST"))
+                                                .hasRole("ADMIN")
+                                                // 박스스코어 → player 통계 동기화
+                                                .requestMatchers(
+                                                                new AntPathRequestMatcher("/crawling/sync-player-stats",
                                                                                 "POST"))
                                                 .hasRole("ADMIN")
                                                 // 경기 일정 크롤링 수동 트리거 (ADMIN 전용)

@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.kbo.stats.mapper.PlayerStatsSyncMapper">
+
+    <!--
+        타자 통계 동기화: game_batter_log 합산 → player 테이블 업데이트
+        홈런은 game_event(HOME_RUN)에서 별도 집계 (LEFT JOIN 행 곱셈 방지)
+        매핑 키: (player.name, player.team) = (batter_log.player_name, 팀명 변환)
+    -->
+    <update id="syncBatterStats">
+        UPDATE player p
+        JOIN (
+            SELECT
+                gbl.player_name                                             AS name,
+                CASE gbl.team_side WHEN 'AWAY' THEN g.away_team
+                                               ELSE g.home_team END        AS team,
+                SUM(gbl.at_bats)                                           AS ab,
+                SUM(gbl.hits)                                              AS h,
+                SUM(gbl.rbi)                                               AS rbi,
+                COUNT(DISTINCT gbl.game_id)                                AS games
+            FROM game_batter_log gbl
+            JOIN game g ON g.id = gbl.game_id
+            GROUP BY gbl.player_name, team
+        ) batter_agg ON p.name = batter_agg.name AND p.team = batter_agg.team
+        LEFT JOIN (
+            SELECT
+                ev.player_name,
+                CASE gbl2.team_side WHEN 'AWAY' THEN g2.away_team
+                                                ELSE g2.home_team END      AS team,
+                COUNT(*)                                                   AS hr_count
+            FROM game_event ev
+            JOIN game_batter_log gbl2
+                ON gbl2.game_id = ev.game_id AND gbl2.player_name = ev.player_name
+            JOIN game g2 ON g2.id = ev.game_id
+            WHERE ev.event_type = 'HOME_RUN'
+            GROUP BY ev.player_name, team
+        ) hr_agg ON hr_agg.player_name = p.name AND hr_agg.team = p.team
+        SET
+            p.hits        = batter_agg.h,
+            p.rbi         = batter_agg.rbi,
+            p.games       = batter_agg.games,
+            p.home_runs   = COALESCE(hr_agg.hr_count, 0),
+            p.batting_avg = CASE
+                                WHEN batter_agg.ab > 0
+                                    THEN ROUND(batter_agg.h / batter_agg.ab, 3)
+                                ELSE NULL
+                            END
+        WHERE p.player_type = 'BATTER'
+    </update>
+
+    <!--
+        투수 통계 동기화: game_pitcher_log 합산 → player 테이블 업데이트
+        ERA = 자책점 * 27 / 총 아웃카운트  (innings_pitched_outs: 아웃카운트 정수)
+    -->
+    <update id="syncPitcherStats">
+        UPDATE player p
+        JOIN (
+            SELECT
+                gpl.player_name                                             AS name,
+                CASE gpl.team_side WHEN 'AWAY' THEN g.away_team
+                                               ELSE g.home_team END        AS team,
+                SUM(gpl.innings_pitched_outs)                              AS total_outs,
+                SUM(gpl.earned_runs)                                       AS er,
+                SUM(CASE WHEN gpl.result = 'WIN'  THEN 1 ELSE 0 END)      AS wins,
+                SUM(CASE WHEN gpl.result = 'SAVE' THEN 1 ELSE 0 END)      AS saves,
+                SUM(CASE WHEN gpl.result = 'HOLD' THEN 1 ELSE 0 END)      AS holds,
+                COUNT(DISTINCT gpl.game_id)                                AS games
+            FROM game_pitcher_log gpl
+            JOIN game g ON g.id = gpl.game_id
+            GROUP BY gpl.player_name, team
+        ) agg ON p.name = agg.name AND p.team = agg.team
+        SET
+            p.wins  = agg.wins,
+            p.saves = agg.saves,
+            p.holds = agg.holds,
+            p.games = agg.games,
+            p.era   = CASE
+                          WHEN agg.total_outs > 0
+                              THEN ROUND(agg.er * 27.0 / agg.total_outs, 2)
+                          ELSE NULL
+                      END
+        WHERE p.player_type = 'PITCHER'
+    </update>
+
+</mapper>

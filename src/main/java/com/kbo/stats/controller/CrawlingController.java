@@ -3,6 +3,7 @@ package com.kbo.stats.controller;
 import com.kbo.stats.service.BoxScoreCrossValidationService;
 import com.kbo.stats.service.CrawlingService;
 import com.kbo.stats.service.MatchupRebuildService;
+import com.kbo.stats.service.PlayerStatsSyncService;
 import io.swagger.v3.oas.annotations.Hidden;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -24,6 +25,7 @@ public class CrawlingController {
     private final CrawlingService                crawlingService;
     private final BoxScoreCrossValidationService boxScoreCrossValidationService;
     private final MatchupRebuildService          matchupRebuildService;
+    private final PlayerStatsSyncService         playerStatsSyncService;
 
     /** 수동 크롤링 실행 */
     @PostMapping("/run")
@@ -58,6 +60,14 @@ public class CrawlingController {
     @PostMapping("/matchup-rebuild-all")
     public ResponseEntity<Map<String, Object>> rebuildAllMatchups() {
         Map<String, Object> result = matchupRebuildService.rebuildAll();
+        return ResponseEntity.ok(result);
+    }
+
+    /** 박스스코어 → player 통계 동기화 (ADMIN 전용) */
+    @ResponseBody
+    @PostMapping("/sync-player-stats")
+    public ResponseEntity<Map<String, Object>> syncPlayerStats() {
+        Map<String, Object> result = playerStatsSyncService.syncAll();
         return ResponseEntity.ok(result);
     }
 }
