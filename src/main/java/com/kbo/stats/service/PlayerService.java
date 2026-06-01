@@ -146,6 +146,9 @@ public class PlayerService {
                 .ifPresentOrElse(
                         existing -> {
                             player.setId(existing.getId());
+                            // stub 보호: position/player_type은 INSERT 시에만 채움
+                            player.setPosition(existing.getPosition());
+                            player.setPlayerType(existing.getPlayerType());
                             playerMapper.update(player);
                         },
                         () -> playerMapper.insert(player)

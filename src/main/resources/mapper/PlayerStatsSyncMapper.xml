@@ -6,7 +6,9 @@
 
     <!--
         타자 통계 동기화: game_batter_log 합산 → player 테이블 업데이트
-        홈런은 game_event(HOME_RUN)에서 별도 집계 (LEFT JOIN 행 곱셈 방지)
+        홈런은 inning_results JSON의 '홈' 약어 패턴(좌홈/중홈/우홈/좌중홈/우중홈, '우홈 / 4구' 같은
+         슬래시 합쳐진 표기 포함)으로 집계. game_event 테이블에 일부 홈런 누락이 발견되어
+         inning_results를 single source of truth로 사용.
         매핑 키: (player.name, player.team) = (batter_log.player_name, 팀명 변환)
     -->
     <update id="syncBatterStats">
@@ -26,16 +28,15 @@
         ) batter_agg ON p.name = batter_agg.name AND p.team = batter_agg.team
         LEFT JOIN (
             SELECT
-                ev.player_name,
-                CASE gbl2.team_side WHEN 'AWAY' THEN g2.away_team
-                                                ELSE g2.home_team END      AS team,
+                gbl_hr.player_name,
+                CASE gbl_hr.team_side WHEN 'AWAY' THEN g_hr.away_team
+                                                  ELSE g_hr.home_team END  AS team,
                 COUNT(*)                                                   AS hr_count
-            FROM game_event ev
-            JOIN game_batter_log gbl2
-                ON gbl2.game_id = ev.game_id AND gbl2.player_name = ev.player_name
-            JOIN game g2 ON g2.id = ev.game_id
-            WHERE ev.event_type = 'HOME_RUN'
-            GROUP BY ev.player_name, team
+            FROM game_batter_log gbl_hr
+            JOIN JSON_TABLE(gbl_hr.inning_results, '$[*]' COLUMNS (val VARCHAR(20) PATH '$')) jt
+                ON jt.val LIKE '%홈%'
+            JOIN game g_hr ON g_hr.id = gbl_hr.game_id
+            GROUP BY gbl_hr.player_name, team
         ) hr_agg ON hr_agg.player_name = p.name AND hr_agg.team = p.team
         SET
             p.at_bats     = batter_agg.ab,

@@ -73,10 +73,13 @@ public class CrawlingService {
     private final PitcherStatsMapper             pitcherStatsMapper;
     private final SabermetricsService            sabermetricsService;
     private final BoxScoreCrossValidationService boxScoreCrossValidationService;
+    private final PlayerStatsSyncService         playerStatsSyncService;
+    private final MatchupRebuildService          matchupRebuildService;
 
     public void crawlAll() {
         log.info("=== KBO 크롤링 시작 (시즌: {}) ===", CURRENT_SEASON);
-        playerService.deleteAll();
+        // stub 선수(박스스코어 fallback)를 보호하기 위해 deleteAll 호출 제거.
+        // saveOrUpdate가 (name, team) 기존 레코드 발견 시 UPDATE로 처리하므로 upsert 동작.
         WebDriver driver = null;
         int batterCount = 0, pitcherCount = 0;
         StopWatch sw = new StopWatch("KBO 크롤링");
@@ -131,6 +134,14 @@ public class CrawlingService {
 
             sw.start("세이버메트릭스 검증");
             runValidation();
+            sw.stop();
+
+            sw.start("박스스코어 → player 통계 동기화");
+            playerStatsSyncService.syncAll();
+            sw.stop();
+
+            sw.start("매치업 player_id 재매핑");
+            matchupRebuildService.rebuildAll();
             sw.stop();
         } finally {
             if (driver != null) {
