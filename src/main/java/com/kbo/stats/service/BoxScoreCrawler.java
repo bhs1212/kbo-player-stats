@@ -21,6 +21,7 @@ public class BoxScoreCrawler {
 
     private final GameMapper             gameMapper;
     private final BoxScoreCollectService collectService;
+    private final PlayerStatsSyncService playerStatsSyncService;
 
     /** 단일 날짜 박스스코어 크롤링 */
     public BoxScoreCrawlSummary crawlByDate(LocalDate date) {
@@ -70,6 +71,14 @@ public class BoxScoreCrawler {
         long durationMs = System.currentTimeMillis() - startMs;
         log.info("[박스스코어 크롤러] 완료 — 전체={} 성공={} 스킵={} 실패={} {}ms",
                 games.size(), successCount, skippedCount, failedCount, durationMs);
+
+        log.info("박스스코어 수집 완료 후 player 통계 자동 동기화 시작");
+        try {
+            playerStatsSyncService.syncAll();
+            log.info("player 통계 동기화 완료");
+        } catch (Exception e) {
+            log.error("player 통계 동기화 실패: {}", e.getMessage(), e);
+        }
 
         return BoxScoreCrawlSummary.builder()
                 .totalCount(games.size())

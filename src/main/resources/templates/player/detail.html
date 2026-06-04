@@ -22,17 +22,7 @@
             <li class="breadcrumb-item active" th:text="${player.name}"></li>
         </ol>
     </nav>
-    <div class="d-flex gap-2" sec:authorize="hasRole('ADMIN')">
-        <a th:href="@{/players/{id}/edit(id=${player.id})}" class="btn btn-warning btn-sm">
-            <i class="bi bi-pencil"></i> 수정
-        </a>
-        <form th:action="@{/players/{id}/delete(id=${player.id})}" method="post">
-            <button type="submit" class="btn btn-danger btn-sm"
-                    onclick="return confirm('삭제하시겠습니까?')">
-                <i class="bi bi-trash"></i> 삭제
-            </button>
-        </form>
-    </div>
+
 </div>
 
 <!-- ── 프로필 + 주요 기록 (기존 4카드) ──────────────────────────── -->

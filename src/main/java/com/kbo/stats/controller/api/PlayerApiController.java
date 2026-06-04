@@ -7,25 +7,19 @@ import com.kbo.stats.service.PlayerVsTeamService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
-import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
-/**
- * KBO 선수 기록 REST API
- * Base URL: /api/v1/players
- */
-@Tag(name = "선수 API", description = "선수 조회/등록/수정/삭제 REST API")
+@Tag(name = "선수 API", description = "선수 조회 REST API")
 @RestController
 @RequestMapping("/api/v1/players")
 @RequiredArgsConstructor
 public class PlayerApiController {
 
-    private final PlayerService playerService;
+    private final PlayerService       playerService;
     private final PlayerVsTeamService playerVsTeamService;
 
     @Operation(summary = "선수 목록 검색", description = "이름, 팀, 포지션, 선수 유형으로 필터링하여 페이지네이션된 선수 목록을 반환합니다.")
@@ -39,31 +33,6 @@ public class PlayerApiController {
     public ApiResponse<Player> get(
             @Parameter(description = "선수 ID") @PathVariable Long id) {
         return ApiResponse.ok(playerService.findById(id));
-    }
-
-    @Operation(summary = "선수 등록", description = "새 선수를 등록합니다. 등록 성공 시 HTTP 201과 생성된 ID를 반환합니다.")
-    @PostMapping
-    public ResponseEntity<ApiResponse<Long>> create(@Valid @RequestBody PlayerFormDto form) {
-        Long id = playerService.save(form);
-        return ResponseEntity.status(HttpStatus.CREATED)
-                .body(ApiResponse.ok("선수가 등록되었습니다.", id));
-    }
-
-    @Operation(summary = "선수 수정", description = "ID에 해당하는 선수 정보를 수정합니다.")
-    @PutMapping("/{id}")
-    public ApiResponse<Void> update(
-            @Parameter(description = "선수 ID") @PathVariable Long id,
-            @Valid @RequestBody PlayerFormDto form) {
-        playerService.update(id, form);
-        return ApiResponse.ok("선수 정보가 수정되었습니다.", null);
-    }
-
-    @Operation(summary = "선수 삭제", description = "ID에 해당하는 선수를 삭제합니다.")
-    @DeleteMapping("/{id}")
-    public ApiResponse<Void> delete(
-            @Parameter(description = "선수 ID") @PathVariable Long id) {
-        playerService.delete(id);
-        return ApiResponse.ok("선수가 삭제되었습니다.", null);
     }
 
     @Operation(summary = "타율 랭킹", description = "타율 기준 상위 타자 랭킹을 반환합니다.")

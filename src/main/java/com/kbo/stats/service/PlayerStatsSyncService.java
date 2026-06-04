@@ -23,14 +23,23 @@ public class PlayerStatsSyncService {
         int batterUpdated  = syncMapper.syncBatterStats();
         int pitcherUpdated = syncMapper.syncPitcherStats();
 
+        // stub 선수도 sabermetrics 갱신 받도록 row 보장
+        syncMapper.ensureBatterStatsRows();
+        syncMapper.ensurePitcherStatsRows();
+
+        int batterSab      = syncMapper.syncBatterSabermetrics();
+        int pitcherSab     = syncMapper.syncPitcherSabermetrics();
+
         long durationMs = System.currentTimeMillis() - start;
-        log.info("[PlayerStatsSync] 완료 batters={} pitchers={} durationMs={}",
-                batterUpdated, pitcherUpdated, durationMs);
+        log.info("[PlayerStatsSync] 완료 batters={} pitchers={} batterSab={} pitcherSab={} durationMs={}",
+                batterUpdated, pitcherUpdated, batterSab, pitcherSab, durationMs);
 
         return Map.of(
-                "batterUpdated",  batterUpdated,
-                "pitcherUpdated", pitcherUpdated,
-                "durationMs",     durationMs
+                "batterUpdated",              batterUpdated,
+                "pitcherUpdated",             pitcherUpdated,
+                "batterSabermetricsUpdated",  batterSab,
+                "pitcherSabermetricsUpdated", pitcherSab,
+                "durationMs",                 durationMs
         );
     }
 }

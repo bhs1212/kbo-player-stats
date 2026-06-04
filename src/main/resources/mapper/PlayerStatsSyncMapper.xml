@@ -53,6 +53,152 @@
     </update>
 
     <!--
+        타자 세이버메트릭스 동기화: game_batter_log + inning_results → player_batter_stats
+        inning_results JSON 파싱으로 2루타/3루타/삼진/사구/희생플라이/희생번트/병살/고의사구 집계.
+        runs/complete_games/shutouts/blown_saves/wild_pitches/balks는 박스스코어 미지원 → NULL 유지.
+    -->
+    <update id="syncBatterSabermetrics">
+        UPDATE player_batter_stats bs
+        JOIN player p ON p.id = bs.player_id
+        LEFT JOIN (
+            SELECT
+                gbl.player_name AS name,
+                CASE gbl.team_side WHEN 'AWAY' THEN g.away_team ELSE g.home_team END AS team,
+                SUM(gbl.at_bats) AS ab,
+                SUM(gbl.hits)    AS h,
+                SUM(gbl.walks)   AS bb
+            FROM game_batter_log gbl
+            JOIN game g ON g.id = gbl.game_id
+            GROUP BY gbl.player_name, team
+        ) basic ON basic.name = p.name AND basic.team = p.team
+        LEFT JOIN (
+            SELECT
+                gbl2.player_name AS name,
+                CASE gbl2.team_side WHEN 'AWAY' THEN g2.away_team ELSE g2.home_team END AS team,
+                SUM(CASE WHEN jt.v LIKE '%홈%'                                THEN 1 ELSE 0 END) AS hr,
+                SUM(CASE WHEN jt.v REGEXP '^(좌|우|중|좌중|우중)2$'          THEN 1 ELSE 0 END) AS doubles_,
+                SUM(CASE WHEN jt.v REGEXP '^(좌|우|중|좌중|우중)3$'          THEN 1 ELSE 0 END) AS triples_,
+                SUM(CASE WHEN jt.v LIKE '%삼진%'                              THEN 1 ELSE 0 END) AS so,
+                SUM(CASE WHEN jt.v LIKE '%사구%'                              THEN 1 ELSE 0 END) AS hbp,
+                SUM(CASE WHEN jt.v LIKE '%희비%'                              THEN 1 ELSE 0 END) AS sf,
+                SUM(CASE WHEN jt.v LIKE '%희번%' OR jt.v LIKE '%희실%'       THEN 1 ELSE 0 END) AS sh,
+                SUM(CASE WHEN jt.v LIKE '%병%'                                THEN 1 ELSE 0 END) AS dp,
+                SUM(CASE WHEN jt.v LIKE '%고4%'                               THEN 1 ELSE 0 END) AS ibb
+            FROM game_batter_log gbl2
+            JOIN JSON_TABLE(gbl2.inning_results, '$[*]' COLUMNS (v VARCHAR(20) PATH '$')) jt ON 1=1
+            JOIN game g2 ON g2.id = gbl2.game_id
+            GROUP BY gbl2.player_name, team
+        ) parsed ON parsed.name = p.name AND parsed.team = p.team
+        SET
+            bs.at_bats           = COALESCE(basic.ab,        0),
+            bs.walks             = COALESCE(basic.bb,        0),
+            bs.doubles           = COALESCE(parsed.doubles_, 0),
+            bs.triples           = COALESCE(parsed.triples_, 0),
+            bs.strikeouts        = COALESCE(parsed.so,       0),
+            bs.hit_by_pitch      = COALESCE(parsed.hbp,      0),
+            bs.sacrifice_flies   = COALESCE(parsed.sf,       0),
+            bs.sacrifice_hits    = COALESCE(parsed.sh,       0),
+            bs.double_plays      = COALESCE(parsed.dp,       0),
+            bs.intentional_walks = COALESCE(parsed.ibb,      0),
+            bs.total_bases       = COALESCE(basic.h, 0)
+                                   + COALESCE(parsed.doubles_, 0)
+                                   + 2 * COALESCE(parsed.triples_, 0)
+                                   + 3 * COALESCE(parsed.hr, 0),
+            bs.plate_appearances = COALESCE(basic.ab, 0)
+                                   + COALESCE(basic.bb, 0)
+                                   + COALESCE(parsed.hbp, 0)
+                                   + COALESCE(parsed.sf, 0)
+                                   + COALESCE(parsed.sh, 0),
+            bs.slugging_pct      = CASE WHEN COALESCE(basic.ab, 0) > 0
+                                        THEN ROUND(
+                                            (COALESCE(basic.h, 0)
+                                             + COALESCE(parsed.doubles_, 0)
+                                             + 2 * COALESCE(parsed.triples_, 0)
+                                             + 3 * COALESCE(parsed.hr, 0))
+                                            / basic.ab, 3)
+                                        ELSE 0 END,
+            bs.on_base_pct       = CASE WHEN (COALESCE(basic.ab, 0)
+                                              + COALESCE(basic.bb, 0)
+                                              + COALESCE(parsed.hbp, 0)
+                                              + COALESCE(parsed.sf, 0)) > 0
+                                        THEN ROUND(
+                                            (COALESCE(basic.h, 0)
+                                             + COALESCE(basic.bb, 0)
+                                             + COALESCE(parsed.hbp, 0))
+                                            / (COALESCE(basic.ab, 0)
+                                               + COALESCE(basic.bb, 0)
+                                               + COALESCE(parsed.hbp, 0)
+                                               + COALESCE(parsed.sf, 0)), 3)
+                                        ELSE 0 END,
+            bs.ops               = COALESCE(bs.on_base_pct, 0) + COALESCE(bs.slugging_pct, 0)
+        WHERE p.player_type = 'BATTER'
+    </update>
+
+    <!--
+        투수 세이버메트릭스 동기화: game_pitcher_log → player_pitcher_stats
+        walks_allowed = walks_hbp (볼넷+사구 합산. HBP 분리 불가 → hbp_allowed=0).
+        complete_games/shutouts/blown_saves/wild_pitches/balks는 박스스코어 미지원 → NULL 유지.
+        QS 기준: 6이닝(18아웃) 이상 + 자책 3점 이하.
+    -->
+    <update id="syncPitcherSabermetrics">
+        UPDATE player_pitcher_stats ps
+        JOIN player p ON p.id = ps.player_id
+        JOIN (
+            SELECT
+                gpl.player_name AS name,
+                CASE gpl.team_side WHEN 'AWAY' THEN g.away_team ELSE g.home_team END AS team,
+                SUM(gpl.innings_pitched_outs) AS outs,
+                SUM(gpl.hits_against)         AS h,
+                SUM(gpl.home_runs_against)    AS hr,
+                SUM(gpl.walks_hbp)            AS bb_hbp,
+                SUM(gpl.strikeouts)           AS so,
+                SUM(gpl.runs_allowed)         AS r,
+                SUM(gpl.earned_runs)          AS er,
+                SUM(gpl.batters_faced)        AS bf,
+                SUM(gpl.pitches)              AS pitches,
+                SUM(gpl.at_bats_against)      AS ab_against,
+                SUM(CASE WHEN gpl.result = 'LOSE'                                      THEN 1 ELSE 0 END) AS losses,
+                SUM(CASE WHEN gpl.innings_pitched_outs >= 18 AND gpl.earned_runs &lt;= 3 THEN 1 ELSE 0 END) AS qs
+            FROM game_pitcher_log gpl
+            JOIN game g ON g.id = gpl.game_id
+            GROUP BY gpl.player_name, team
+        ) agg ON agg.name = p.name AND agg.team = p.team
+        SET
+            ps.innings_outs      = agg.outs,
+            ps.hits_allowed      = agg.h,
+            ps.home_runs_allowed = agg.hr,
+            ps.walks_allowed     = agg.bb_hbp,
+            ps.hbp_allowed       = 0,
+            ps.strikeouts        = agg.so,
+            ps.runs_allowed      = agg.r,
+            ps.earned_runs       = agg.er,
+            ps.batters_faced     = agg.bf,
+            ps.pitches_thrown    = agg.pitches,
+            ps.losses            = agg.losses,
+            ps.quality_starts    = agg.qs,
+            ps.whip              = CASE WHEN agg.outs > 0
+                                        THEN ROUND((agg.h + agg.bb_hbp) * 3.0 / agg.outs, 2)
+                                        ELSE 0 END,
+            ps.opponent_avg      = CASE WHEN agg.ab_against > 0
+                                        THEN ROUND(agg.h / agg.ab_against, 3)
+                                        ELSE 0 END,
+            ps.win_pct           = CASE WHEN (p.wins + agg.losses) > 0
+                                        THEN ROUND(p.wins / (p.wins + agg.losses), 3)
+                                        ELSE 0 END
+        WHERE p.player_type = 'PITCHER'
+    </update>
+
+    <insert id="ensureBatterStatsRows">
+        INSERT IGNORE INTO player_batter_stats (player_id)
+        SELECT id FROM player WHERE player_type = 'BATTER'
+    </insert>
+
+    <insert id="ensurePitcherStatsRows">
+        INSERT IGNORE INTO player_pitcher_stats (player_id)
+        SELECT id FROM player WHERE player_type = 'PITCHER'
+    </insert>
+
+    <!--
         투수 통계 동기화: game_pitcher_log 합산 → player 테이블 업데이트
         ERA = 자책점 * 27 / 총 아웃카운트  (innings_pitched_outs: 아웃카운트 정수)
     -->

@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="ko" xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security"
+<html lang="ko" xmlns:th="http://www.thymeleaf.org"
       th:replace="~{layout/base :: base(
           title='선수 목록',
           content=~{::main-content},
@@ -11,21 +11,6 @@
 
 <div class="d-flex justify-content-between align-items-center mb-3">
     <h4 class="mb-0"><i class="bi bi-people-fill text-primary"></i> 선수 목록</h4>
-    <!-- 관리자 전용 버튼 -->
-    <div class="d-flex gap-2" sec:authorize="hasRole('ADMIN')">
-        <button class="btn btn-outline-secondary btn-sm" data-bs-toggle="modal" data-bs-target="#importModal">
-            <i class="bi bi-upload"></i> CSV 임포트
-        </button>
-        <form th:action="@{/crawling/run}" method="post" class="d-inline">
-            <button type="submit" class="btn btn-outline-info btn-sm"
-                    onclick="return confirm('크롤링을 실행하시겠습니까? (시간이 걸릴 수 있습니다)')">
-                <i class="bi bi-cloud-download"></i> 크롤링 실행
-            </button>
-        </form>
-        <a th:href="@{/players/new}" class="btn btn-primary btn-sm">
-            <i class="bi bi-plus-lg"></i> 선수 등록
-        </a>
-    </div>
 </div>
 <div class="alert alert-info border-0 mb-3">
     <div class="d-flex align-items-start">
@@ -111,12 +96,11 @@
             <th>안타</th>
             <th>타점</th>
             <th>경기</th>
-            <th>관리</th>
         </tr>
         </thead>
         <tbody>
         <tr th:if="${page.content.isEmpty()}">
-            <td colspan="9" class="text-center text-muted py-4">
+            <td colspan="8" class="text-center text-muted py-4">
                 <i class="bi bi-inbox fs-3 d-block mb-2"></i>
                 등록된 선수가 없습니다.
             </td>
@@ -133,20 +117,6 @@
             <td th:text="${player.hits != null ? player.hits : '-'}"></td>
             <td th:text="${player.rbi != null ? player.rbi : '-'}"></td>
             <td th:text="${player.games != null ? player.games : '-'}"></td>
-            <td>
-                <div class="d-flex gap-1" sec:authorize="hasRole('ADMIN')">
-                    <a th:href="@{/players/{id}/edit(id=${player.id})}"
-                       class="btn btn-outline-warning btn-sm">
-                        <i class="bi bi-pencil"></i>
-                    </a>
-                    <form th:action="@{/players/{id}/delete(id=${player.id})}" method="post" class="d-inline">
-                        <button type="submit" class="btn btn-outline-danger btn-sm"
-                                onclick="return confirm('삭제하시겠습니까?')">
-                            <i class="bi bi-trash"></i>
-                        </button>
-                    </form>
-                </div>
-            </td>
         </tr>
         </tbody>
     </table>
@@ -163,12 +133,11 @@
             <th>방어율</th>
             <th>승</th>
             <th>경기</th>
-            <th>관리</th>
         </tr>
         </thead>
         <tbody>
         <tr th:if="${page.content.isEmpty()}">
-            <td colspan="7" class="text-center text-muted py-4">
+            <td colspan="6" class="text-center text-muted py-4">
                 <i class="bi bi-inbox fs-3 d-block mb-2"></i>
                 등록된 선수가 없습니다.
             </td>
@@ -183,20 +152,6 @@
             <td th:text="${player.era != null ? #numbers.formatDecimal(player.era, 1, 2) : '-'}"></td>
             <td th:text="${player.wins != null ? player.wins : '-'}"></td>
             <td th:text="${player.games != null ? player.games : '-'}"></td>
-            <td>
-                <div class="d-flex gap-1" sec:authorize="hasRole('ADMIN')">
-                    <a th:href="@{/players/{id}/edit(id=${player.id})}"
-                       class="btn btn-outline-warning btn-sm">
-                        <i class="bi bi-pencil"></i>
-                    </a>
-                    <form th:action="@{/players/{id}/delete(id=${player.id})}" method="post" class="d-inline">
-                        <button type="submit" class="btn btn-outline-danger btn-sm"
-                                onclick="return confirm('삭제하시겠습니까?')">
-                            <i class="bi bi-trash"></i>
-                        </button>
-                    </form>
-                </div>
-            </td>
         </tr>
         </tbody>
     </table>
@@ -225,35 +180,6 @@
         </li>
     </ul>
 </nav>
-
-<!-- CSV 임포트 모달 (관리자 전용) -->
-<div class="modal fade" id="importModal" tabindex="-1" sec:authorize="hasRole('ADMIN')">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <form th:action="@{/players/import}" method="post" enctype="multipart/form-data">
-                <div class="modal-header">
-                    <h5 class="modal-title"><i class="bi bi-upload"></i> CSV 파일 임포트</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                </div>
-                <div class="modal-body">
-                    <p class="text-muted small">
-                        CSV 파일 형식: <code>name,team,position,playerType,battingAvg,homeRuns,hits,rbi,era,wins,games</code>
-                    </p>
-                    <input type="file" name="file" class="form-control" accept=".csv" required>
-                    <div class="mt-2">
-                        <a th:href="@{/data/players-sample.csv}" class="btn btn-link btn-sm p-0">
-                            <i class="bi bi-download"></i> 샘플 CSV 다운로드
-                        </a>
-                    </div>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">취소</button>
-                    <button type="submit" class="btn btn-primary">임포트</button>
-                </div>
-            </form>
-        </div>
-    </div>
-</div>
 
 </th:block>
 </body>

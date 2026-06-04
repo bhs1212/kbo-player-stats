@@ -59,25 +59,6 @@ public class SecurityConfig {
                                                 .requestMatchers("/my/**").hasAnyRole("USER", "ADMIN")
 
                                                 // ── 관리자 전용 경로 (GET 전체 허용보다 먼저 선언해야 함) ──
-                                                .requestMatchers(
-                                                                new AntPathRequestMatcher("/players/new", "GET"),
-                                                                new AntPathRequestMatcher("/players/*/edit", "GET"),
-                                                                new AntPathRequestMatcher("/players", "POST"),
-                                                                new AntPathRequestMatcher("/players/*", "POST"),
-                                                                new AntPathRequestMatcher("/players/*/delete", "POST"),
-                                                                new AntPathRequestMatcher("/players/import", "POST"))
-                                                .hasRole("ADMIN")
-                                                // PlayerApiController REST 변경 작업
-                                                .requestMatchers(
-                                                                new AntPathRequestMatcher("/api/v1/players", "POST"),
-                                                                new AntPathRequestMatcher("/api/v1/players/**", "PUT"),
-                                                                new AntPathRequestMatcher("/api/v1/players/**",
-                                                                                "DELETE"))
-                                                .hasRole("ADMIN")
-                                                // CrawlingController (선수 크롤링)
-                                                .requestMatchers(
-                                                                new AntPathRequestMatcher("/crawling/run", "POST"))
-                                                .hasRole("ADMIN")
                                                 // BoxScoreCrawlController (박스스코어 수집)
                                                 .requestMatchers(
                                                                 new AntPathRequestMatcher("/crawling/boxscore", "POST"))

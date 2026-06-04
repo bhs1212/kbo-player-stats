@@ -69,7 +69,7 @@
             <version>5.9</version>
         </dependency>
 
-        <!-- Selenium WebDriver -->
+        <!-- Selenium WebDriver (GameCrawler 경기 일정 수집) -->
         <dependency>
             <groupId>org.seleniumhq.selenium</groupId>
             <artifactId>selenium-java</artifactId>
