@@ -329,11 +329,11 @@
           </div>
         </div>
 
-        <!-- 우하단: 시즌 전체 랭킹 TOP 5 -->
+        <!-- 우하단: 시즌 전체 랭킹 TOP 10 -->
         <div class="col-md-6">
           <div class="card dashboard-card">
             <div class="card-header">
-              <i class="bi bi-trophy-fill me-1 text-warning"></i> 시즌 랭킹 TOP 5
+              <i class="bi bi-trophy-fill me-1 text-warning"></i> 시즌 랭킹 TOP 10
             </div>
             <div class="card-body p-3">
               <ul class="nav nav-tabs mb-2" role="tablist">
@@ -356,16 +356,16 @@
               </ul>
               <div class="tab-content">
                 <div class="tab-pane fade show active" id="tab-batting-login">
-                  <th:block th:replace="~{home/fragments :: rankingList(${battingTop5}, 'battingAvg')}"></th:block>
+                  <th:block th:replace="~{home/fragments :: rankingList(${battingTop10}, 'battingAvg')}"></th:block>
                 </div>
                 <div class="tab-pane fade" id="tab-hr-login">
-                  <th:block th:replace="~{home/fragments :: rankingList(${homeRunTop5}, 'homeRuns')}"></th:block>
+                  <th:block th:replace="~{home/fragments :: rankingList(${homeRunTop10}, 'homeRuns')}"></th:block>
                 </div>
                 <div class="tab-pane fade" id="tab-era-login">
-                  <th:block th:replace="~{home/fragments :: rankingList(${eraTop5}, 'era')}"></th:block>
+                  <th:block th:replace="~{home/fragments :: rankingList(${eraTop10}, 'era')}"></th:block>
                 </div>
                 <div class="tab-pane fade" id="tab-wins-login">
-                  <th:block th:replace="~{home/fragments :: rankingList(${winsTop5}, 'wins')}"></th:block>
+                  <th:block th:replace="~{home/fragments :: rankingList(${winsTop10}, 'wins')}"></th:block>
                 </div>
               </div>
             </div>
@@ -455,11 +455,11 @@
 
       <div class="row g-3 mb-4">
 
-        <!-- 좌하단: 시즌 랭킹 TOP 5 -->
+        <!-- 좌하단: 시즌 랭킹 TOP 10 -->
         <div class="col-md-6">
           <div class="card dashboard-card">
             <div class="card-header">
-              <i class="bi bi-trophy-fill me-1 text-warning"></i> 시즌 랭킹 TOP 5
+              <i class="bi bi-trophy-fill me-1 text-warning"></i> 시즌 랭킹 TOP 10
             </div>
             <div class="card-body p-3">
               <ul class="nav nav-tabs mb-2" role="tablist">
@@ -482,16 +482,16 @@
               </ul>
               <div class="tab-content">
                 <div class="tab-pane fade show active" id="tab-batting">
-                  <th:block th:replace="~{home/fragments :: rankingList(${battingTop5}, 'battingAvg')}"></th:block>
+                  <th:block th:replace="~{home/fragments :: rankingList(${battingTop10}, 'battingAvg')}"></th:block>
                 </div>
                 <div class="tab-pane fade" id="tab-hr">
-                  <th:block th:replace="~{home/fragments :: rankingList(${homeRunTop5}, 'homeRuns')}"></th:block>
+                  <th:block th:replace="~{home/fragments :: rankingList(${homeRunTop10}, 'homeRuns')}"></th:block>
                 </div>
                 <div class="tab-pane fade" id="tab-era">
-                  <th:block th:replace="~{home/fragments :: rankingList(${eraTop5}, 'era')}"></th:block>
+                  <th:block th:replace="~{home/fragments :: rankingList(${eraTop10}, 'era')}"></th:block>
                 </div>
                 <div class="tab-pane fade" id="tab-wins">
-                  <th:block th:replace="~{home/fragments :: rankingList(${winsTop5}, 'wins')}"></th:block>
+                  <th:block th:replace="~{home/fragments :: rankingList(${winsTop10}, 'wins')}"></th:block>
                 </div>
               </div>
             </div>

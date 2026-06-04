@@ -62,11 +62,11 @@ public class HomeController {
         log.info("============================");
         model.addAttribute("yesterdayGames", yesterdayFinished);
 
-        // 시즌 랭킹 TOP5 (캐싱됨)
-        model.addAttribute("battingTop5", dashboardService.getSeasonRanking("batting", 5));
-        model.addAttribute("homeRunTop5", dashboardService.getSeasonRanking("homerun", 5));
-        model.addAttribute("eraTop5", dashboardService.getSeasonRanking("era", 5));
-        model.addAttribute("winsTop5", dashboardService.getSeasonRanking("wins", 5));
+        // 시즌 랭킹 TOP10 (캐싱됨)
+        model.addAttribute("battingTop10", dashboardService.getSeasonRanking("batting", 10));
+        model.addAttribute("homeRunTop10", dashboardService.getSeasonRanking("homerun", 10));
+        model.addAttribute("eraTop10", dashboardService.getSeasonRanking("era", 10));
+        model.addAttribute("winsTop10", dashboardService.getSeasonRanking("wins", 10));
 
         // 팀 순위 (캐싱됨)
         model.addAttribute("teamStandings", dashboardService.getTeamStandings());

@@ -85,16 +85,10 @@ public class GameCrawler {
 
     // ── 스케줄러 ──────────────────────────────────────────────────
 
-    @Scheduled(cron = "0 0 4 * * *")
-    public void scheduledMorning() {
-        log.info("[경기 크롤러] 새벽 4시 스케줄 실행");
-        crawlCurrentMonth();
-    }
-
-    @Scheduled(cron = "0 0 23 * * *")
-    public void scheduledEvening() {
-        log.info("[경기 크롤러] 오후 11시 스케줄 실행");
-        crawlCurrentMonth();
+    @Scheduled(cron = "0 40 23 * * *")
+    public void scheduledDaily() {
+        log.info("[경기 크롤러] 매일 23:40 자동 실행 (활성 월 갱신)");
+        crawlActiveMonths();
     }
 
     // ── 공개 API ──────────────────────────────────────────────────
