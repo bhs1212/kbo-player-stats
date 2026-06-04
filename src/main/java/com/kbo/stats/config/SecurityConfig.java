@@ -29,6 +29,8 @@ public class SecurityConfig {
                                                 .ignoringRequestMatchers(
                                                                 new AntPathRequestMatcher("/api/**"),
                                                                 new AntPathRequestMatcher("/crawling/boxscore", "POST"),
+                                                                new AntPathRequestMatcher("/crawling/boxscore-refresh",
+                                                                                "POST"),
                                                                 new AntPathRequestMatcher("/crawling/cross-validation",
                                                                                 "POST"),
                                                                 new AntPathRequestMatcher("/crawling/matchup-rebuild**",
@@ -76,6 +78,11 @@ public class SecurityConfig {
                                                 // 박스스코어 → player 통계 동기화
                                                 .requestMatchers(
                                                                 new AntPathRequestMatcher("/crawling/sync-player-stats",
+                                                                                "POST"))
+                                                .hasRole("ADMIN")
+                                                // 박스스코어 증분 갱신 (ADMIN 전용)
+                                                .requestMatchers(
+                                                                new AntPathRequestMatcher("/crawling/boxscore-refresh",
                                                                                 "POST"))
                                                 .hasRole("ADMIN")
                                                 // 경기 일정 크롤링 수동 트리거 (ADMIN 전용)

@@ -127,6 +127,15 @@
         ORDER BY game_date, game_time
     </select>
 
+    <!-- 박스스코어 없는 완료 경기 (증분 수집용) -->
+    <select id="findFinishedWithoutBoxScore" resultMap="GameResultMap">
+        SELECT g.* FROM game g
+        LEFT JOIN game_boxscore bs ON bs.game_id = g.id
+        WHERE g.status = 'FINISHED'
+          AND bs.game_id IS NULL
+        ORDER BY g.game_date, g.id
+    </select>
+
     <!-- 상태별 ID 목록 (매치업 재구성용) -->
     <select id="findIdsByStatus" resultType="long">
         SELECT id FROM game WHERE status = #{status} ORDER BY game_date, id

@@ -51,6 +51,9 @@ public interface GameMapper {
     /** 상태별 ID 목록 조회 (매치업 재구성용) */
     List<Long> findIdsByStatus(@Param("status") GameStatus status);
 
+    /** 박스스코어가 없는 완료된 경기 조회 (증분 수집용) */
+    List<Game> findFinishedWithoutBoxScore();
+
     /** 팀별 평균 완료 경기수 (규정타석/이닝 계산 기준) */
     int getAverageTeamGameCount();
 }

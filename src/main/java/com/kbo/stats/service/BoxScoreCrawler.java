@@ -23,6 +23,64 @@ public class BoxScoreCrawler {
     private final BoxScoreCollectService collectService;
     private final PlayerStatsSyncService playerStatsSyncService;
 
+    /** 박스스코어가 없는 완료 경기만 증분 수집 */
+    public BoxScoreCrawlSummary crawlMissing() {
+        long startMs = System.currentTimeMillis();
+        log.info("[박스스코어 크롤러] 증분 수집 시작 (박스스코어 없는 FINISHED 경기만)");
+
+        List<Game> games = gameMapper.findFinishedWithoutBoxScore();
+        log.info("[박스스코어 크롤러] 누락 경기 {}건", games.size());
+
+        int successCount = 0, skippedCount = 0, failedCount = 0;
+        List<Long> failedGameIds = new ArrayList<>();
+
+        for (Game game : games) {
+            Long gameId = game.getId();
+            try {
+                BoxScoreCollectResult result = collectService.collectOne(gameId);
+                switch (result.getStatus()) {
+                    case SUCCESS -> successCount++;
+                    case SKIPPED -> skippedCount++;
+                    case FAILED  -> { failedCount++; failedGameIds.add(gameId); }
+                }
+                if (result.getStatus() != BoxScoreCollectResult.Status.SKIPPED) {
+                    Thread.sleep(SLEEP_MS);
+                }
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                log.warn("[박스스코어 크롤러] 인터럽트 발생, 중단 (완료: {}건)", successCount);
+                break;
+            } catch (Exception e) {
+                failedCount++;
+                failedGameIds.add(gameId);
+                log.error("[박스스코어 크롤러] 예외 gameId={}: {}", gameId, e.getMessage());
+            }
+        }
+
+        long durationMs = System.currentTimeMillis() - startMs;
+        log.info("[박스스코어 크롤러] 증분 완료 — 전체={} 성공={} 스킵={} 실패={} {}ms",
+                games.size(), successCount, skippedCount, failedCount, durationMs);
+
+        if (successCount > 0) {
+            log.info("박스스코어 증분 수집 후 player 통계 자동 동기화 시작");
+            try {
+                playerStatsSyncService.syncAll();
+                log.info("player 통계 동기화 완료");
+            } catch (Exception e) {
+                log.error("player 통계 동기화 실패: {}", e.getMessage(), e);
+            }
+        }
+
+        return BoxScoreCrawlSummary.builder()
+                .totalCount(games.size())
+                .successCount(successCount)
+                .skippedCount(skippedCount)
+                .failedCount(failedCount)
+                .failedGameIds(failedGameIds)
+                .durationMs(durationMs)
+                .build();
+    }
+
     /** 단일 날짜 박스스코어 크롤링 */
     public BoxScoreCrawlSummary crawlByDate(LocalDate date) {
         return crawlRange(date, date);

@@ -175,13 +175,13 @@ public class GameController {
             .collect(Collectors.toList());
     }
 
-    /** ADMIN 전용: 시즌 전체(3~11월) 크롤링 */
+    /** ADMIN 전용: 현재 월 + 다음 월 경기 일정 갱신 */
     @PostMapping("/crawl")
     public String triggerCrawl(RedirectAttributes redirectAttributes) {
-        int count = gameCrawler.crawlAllGames();
+        int count = gameCrawler.crawlActiveMonths();
         redirectAttributes.addFlashAttribute(
                 count > 0 ? "successMessage" : "errorMessage",
-                count > 0 ? "시즌 전체 " + count + "건의 경기 데이터를 갱신했습니다." : "크롤링 결과가 없습니다. 로그를 확인하세요.");
+                count > 0 ? "현재/다음 월 " + count + "건의 경기 데이터를 갱신했습니다." : "크롤링 결과가 없습니다. 로그를 확인하세요.");
         return "redirect:/games";
     }
 

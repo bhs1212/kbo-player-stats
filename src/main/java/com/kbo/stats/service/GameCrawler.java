@@ -105,6 +105,30 @@ public class GameCrawler {
         return crawlMonth(now.getYear(), now.getMonthValue(), seriesIds);
     }
 
+    /** 현재 월 + 다음 월 경기 일정 갱신 (효율적 갱신) */
+    public int crawlActiveMonths() {
+        LocalDate now = LocalDate.now();
+        int year = now.getYear();
+        int currentMonth = now.getMonthValue();
+        int nextMonth = currentMonth + 1;
+
+        log.info("[경기 크롤러] 활성 월 갱신 시작 ({}년 {}월~{}월)", year, currentMonth, nextMonth);
+        int total = 0;
+
+        String currentSeries = resolveSeriesIds(year, currentMonth);
+        total += crawlMonth(year, currentMonth, currentSeries);
+
+        if (nextMonth <= SEASON_END_MONTH) {
+            String nextSeries = resolveSeriesIds(year, nextMonth);
+            total += crawlMonth(year, nextMonth, nextSeries);
+        } else {
+            log.info("[경기 크롤러] 다음 월이 시즌 범위 밖 - 건너뜀");
+        }
+
+        log.info("[경기 크롤러] 활성 월 갱신 완료 - 합계 {}건", total);
+        return total;
+    }
+
     /** 현재 연도 시즌 전체(3~11월) 크롤링 */
     public int crawlAllGames() {
         return crawlAllGames(LocalDate.now().getYear());
