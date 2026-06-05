@@ -40,10 +40,6 @@ public interface PlayerMapper {
     // 전체 삭제 (크롤링 전 초기화)
     void deleteAll();
 
-    // 도루 단건 업데이트
-    void updateStolenBases(@Param("name") String name, @Param("team") String team,
-                           @Param("stolenBases") Integer stolenBases);
-
     // 세이브/홀드 단건 업데이트 (구원투수 크롤링용)
     void updateSavesAndHolds(@Param("name") String name, @Param("team") String team,
                               @Param("saves") Integer saves, @Param("holds") Integer holds);

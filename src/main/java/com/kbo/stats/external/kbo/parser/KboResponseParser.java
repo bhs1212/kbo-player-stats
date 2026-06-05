@@ -24,8 +24,14 @@ public class KboResponseParser {
     private static final Pattern HOME_RUN_PATTERN =
             Pattern.compile("(\\S+?)(\\d+)호\\((\\d+)회(\\d+)점\\s*([^\\s)]+)\\)");
 
-    private static final Pattern SIMPLE_EVENT_PATTERN =
-            Pattern.compile("(\\S+)\\((\\d+)회\\)");
+    // 홈런 외 모든 이벤트: "박준우2(7회)", "박민우2(2회 9회)", "김선빈(1 6회)" 등
+    // group1=선수명, group2=횟수(없으면1), group3=괄호 안 내용
+    private static final Pattern EVENT_PATTERN =
+            Pattern.compile("([가-힣A-Za-z]+?)(\\d*)\\(([^)]+)\\)");
+
+    // 괄호 내 숫자만 추출 — "1회", "1 6회", "2회 9회" 모두 처리
+    private static final Pattern INNING_NUMBER_PATTERN =
+            Pattern.compile("(\\d+)");
 
     private final ObjectMapper objectMapper;
 
@@ -214,12 +220,15 @@ public class KboResponseParser {
                 if (value == null || value.isEmpty()) continue;
 
                 String eventType = toEventType(label);
-                if (eventType == null) continue;
+                if (eventType == null) {
+                    log.debug("[박스스코어 파서] 미매핑 라벨: {} = {}", label, value);
+                    continue;
+                }
 
                 if ("HOME_RUN".equals(eventType)) {
                     result.addAll(parseHomeRuns(value));
                 } else {
-                    result.addAll(parseSimpleEvents(eventType, value));
+                    result.addAll(parseMultiEvents(eventType, value));
                 }
             }
         } catch (Exception e) {
@@ -279,28 +288,46 @@ public class KboResponseParser {
         return list;
     }
 
-    private List<ParsedGameEvent> parseSimpleEvents(String eventType, String text) {
+    // KBO 이벤트 통합 파서: "선수명N(회차…)" 형식 처리
+    // - group(2) 숫자 = 이벤트 횟수, 없으면 1
+    // - group(3) 내 숫자들 = 회차 목록, 모자라면 마지막 회차 재사용
+    private List<ParsedGameEvent> parseMultiEvents(String eventType, String text) {
         List<ParsedGameEvent> list = new ArrayList<>();
-        Matcher m = SIMPLE_EVENT_PATTERN.matcher(text);
+        Matcher m = EVENT_PATTERN.matcher(text);
         while (m.find()) {
-            list.add(ParsedGameEvent.builder()
-                    .eventType(eventType)
-                    .playerName(m.group(1).trim())
-                    .inning(parseIntSafe(m.group(2)))
-                    .rawText(m.group(0))
-                    .build());
+            String playerName = m.group(1);
+            int count = m.group(2).isEmpty() ? 1 : Integer.parseInt(m.group(2));
+            String inningsPart = m.group(3);
+            String rawText = m.group(0);
+
+            List<Integer> innings = new ArrayList<>();
+            Matcher im = INNING_NUMBER_PATTERN.matcher(inningsPart);
+            while (im.find()) innings.add(Integer.parseInt(im.group(1)));
+            if (innings.isEmpty()) innings.add(0);
+
+            for (int i = 0; i < count; i++) {
+                int inning = innings.get(Math.min(i, innings.size() - 1));
+                list.add(ParsedGameEvent.builder()
+                        .eventType(eventType)
+                        .playerName(playerName)
+                        .inning(inning)
+                        .rawText(rawText)
+                        .build());
+            }
         }
         return list;
     }
 
     private String toEventType(String label) {
         return switch (label) {
-            case "홈런"  -> "HOME_RUN";
-            case "3루타" -> "TRIPLE";
-            case "2루타" -> "DOUBLE";
-            case "실책"  -> "ERROR";
-            case "병살타" -> "DOUBLE_PLAY";
-            case "폭투"  -> "WILD_PITCH";
+            case "홈런"    -> "HOME_RUN";
+            case "3루타"   -> "TRIPLE";
+            case "2루타"   -> "DOUBLE";
+            case "실책"    -> "ERROR";
+            case "병살타"  -> "DOUBLE_PLAY";
+            case "폭투"    -> "WILD_PITCH";
+            case "도루"    -> "STOLEN_BASE";
+            case "도루실패" -> "CAUGHT_STEALING";
             default -> null;
         };
     }

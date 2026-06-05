@@ -29,6 +29,7 @@ public class SecurityConfig {
                                                 .ignoringRequestMatchers(
                                                                 new AntPathRequestMatcher("/api/**"),
                                                                 new AntPathRequestMatcher("/crawling/boxscore", "POST"),
+                                                                new AntPathRequestMatcher("/crawling/boxscore-range", "POST"),
                                                                 new AntPathRequestMatcher("/crawling/boxscore-refresh",
                                                                                 "POST"),
                                                                 new AntPathRequestMatcher("/crawling/cross-validation",
@@ -64,6 +65,11 @@ public class SecurityConfig {
                                                 // BoxScoreCrawlController (박스스코어 수집)
                                                 .requestMatchers(
                                                                 new AntPathRequestMatcher("/crawling/boxscore", "POST"))
+                                                .hasRole("ADMIN")
+                                                // 박스스코어 날짜 범위 일괄 재수집 (ADMIN 전용)
+                                                .requestMatchers(
+                                                                new AntPathRequestMatcher("/crawling/boxscore-range",
+                                                                                "POST"))
                                                 .hasRole("ADMIN")
                                                 // 박스스코어 교차 검증
                                                 .requestMatchers(

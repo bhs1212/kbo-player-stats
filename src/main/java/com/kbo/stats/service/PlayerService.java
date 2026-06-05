@@ -63,11 +63,6 @@ public class PlayerService {
     }
 
     @Transactional
-    public void updateStolenBases(String name, String team, Integer stolenBases) {
-        playerMapper.updateStolenBases(name, team, stolenBases);
-    }
-
-    @Transactional
     public void saveOrUpdateSavesHolds(String name, String team,
                                         Integer saves, Integer holds,
                                         Double era, Integer games, Integer wins) {

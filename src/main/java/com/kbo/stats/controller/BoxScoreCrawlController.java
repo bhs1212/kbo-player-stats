@@ -54,4 +54,16 @@ public class BoxScoreCrawlController {
         BoxScoreCrawlSummary summary = crawler.crawlByDate(localDate);
         return ResponseEntity.ok(summary);
     }
+
+    /** 날짜 범위 박스스코어 일괄 재수집 (ADMIN 전용). ?start=YYYYMMDD&end=YYYYMMDD */
+    @PostMapping("/boxscore-range")
+    public ResponseEntity<BoxScoreCrawlSummary> triggerRange(
+            @RequestParam String start,
+            @RequestParam String end) {
+        LocalDate startDate = LocalDate.parse(start, DateTimeFormatter.ofPattern("yyyyMMdd"));
+        LocalDate endDate   = LocalDate.parse(end,   DateTimeFormatter.ofPattern("yyyyMMdd"));
+        BoxScoreCrawlSummary summary = crawler.crawlRange(startDate, endDate);
+        return ResponseEntity.ok(summary);
+    }
+
 }

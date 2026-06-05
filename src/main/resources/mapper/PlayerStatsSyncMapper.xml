@@ -38,17 +38,31 @@
             JOIN game g_hr ON g_hr.id = gbl_hr.game_id
             GROUP BY gbl_hr.player_name, team
         ) hr_agg ON hr_agg.player_name = p.name AND hr_agg.team = p.team
+        LEFT JOIN (
+            SELECT
+                ev.player_name,
+                CASE gbl_sb.team_side WHEN 'AWAY' THEN g_sb.away_team
+                                                  ELSE g_sb.home_team END  AS team,
+                COUNT(*)                                                   AS cnt
+            FROM game_event ev
+            JOIN game_batter_log gbl_sb
+                ON gbl_sb.game_id = ev.game_id AND gbl_sb.player_name = ev.player_name
+            JOIN game g_sb ON g_sb.id = ev.game_id
+            WHERE ev.event_type = 'STOLEN_BASE'
+            GROUP BY ev.player_name, team
+        ) sb_agg ON sb_agg.player_name = p.name AND sb_agg.team = p.team
         SET
-            p.at_bats     = batter_agg.ab,
-            p.hits        = batter_agg.h,
-            p.rbi         = batter_agg.rbi,
-            p.games       = batter_agg.games,
-            p.home_runs   = COALESCE(hr_agg.hr_count, 0),
-            p.batting_avg = CASE
-                                WHEN batter_agg.ab > 0
-                                    THEN ROUND(batter_agg.h / batter_agg.ab, 3)
-                                ELSE NULL
-                            END
+            p.at_bats      = batter_agg.ab,
+            p.hits         = batter_agg.h,
+            p.rbi          = batter_agg.rbi,
+            p.games        = batter_agg.games,
+            p.home_runs    = COALESCE(hr_agg.hr_count, 0),
+            p.stolen_bases = COALESCE(sb_agg.cnt, 0),
+            p.batting_avg  = CASE
+                                 WHEN batter_agg.ab > 0
+                                     THEN ROUND(batter_agg.h / batter_agg.ab, 3)
+                                 ELSE NULL
+                             END
         WHERE p.player_type = 'BATTER'
     </update>
 

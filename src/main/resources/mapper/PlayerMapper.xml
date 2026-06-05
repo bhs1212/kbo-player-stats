@@ -137,16 +137,6 @@
           AND player_type = 'PITCHER'
     </update>
 
-    <!-- 도루 단건 업데이트 (도루 크롤링용) -->
-    <update id="updateStolenBases">
-        UPDATE player
-        SET stolen_bases = #{stolenBases},
-            updated_at   = NOW()
-        WHERE name = #{name}
-          AND team = #{team}
-          AND player_type = 'BATTER'
-    </update>
-
     <!-- 삭제 -->
     <delete id="deleteById">
         DELETE FROM player WHERE id = #{id}

@@ -122,11 +122,11 @@ CREATE TABLE IF NOT EXISTS game_inning_score (
     CONSTRAINT fk_inning_game FOREIGN KEY (game_id) REFERENCES game(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='이닝별 득점';
 
--- 2-3. game_event (홈런/2루타/3루타/실책/병살타/폭투 등 주요 이벤트)
+-- 2-3. game_event (홈런/2루타/3루타/실책/병살타/폭투/도루 등 주요 이벤트)
 CREATE TABLE IF NOT EXISTS game_event (
     id               BIGINT AUTO_INCREMENT PRIMARY KEY,
     game_id          BIGINT NOT NULL,
-    event_type       ENUM('HOME_RUN','TRIPLE','DOUBLE','ERROR','DOUBLE_PLAY','WILD_PITCH') NOT NULL,
+    event_type       ENUM('HOME_RUN','TRIPLE','DOUBLE','ERROR','DOUBLE_PLAY','WILD_PITCH','STOLEN_BASE','CAUGHT_STEALING') NOT NULL,
     player_name      VARCHAR(50)  NULL,
     inning           INT          NULL,
     season_count     INT          NULL     COMMENT '홈런 시즌 N호',
