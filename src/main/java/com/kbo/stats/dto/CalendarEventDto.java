@@ -13,6 +13,7 @@ public class CalendarEventDto {
     private Long id;
     private String title;
     private String start;
+    private String end;
     private String backgroundColor;
     private String borderColor;
     private Map<String, Object> extendedProps;

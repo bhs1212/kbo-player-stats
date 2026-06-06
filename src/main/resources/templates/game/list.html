@@ -10,7 +10,7 @@
 
 <!-- ── CSS ── -->
 <th:block th:fragment="game-list-css">
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.css">
+<link href='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.15/index.global.min.css' rel='stylesheet' />
 <style>
 /* ── 팀 텍스트 색상 (다른 페이지 공용, 건드리지 말 것) ── */
 .team-kia     { color: #EA0029; }
@@ -115,6 +115,22 @@
 .fc-daygrid-day-number:hover {
   text-decoration: none !important;
 }
+
+/* ── LIVE 배지 깜빡임 ── */
+@keyframes live-blink {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.3; }
+}
+.badge-live-blink { animation: live-blink 1.2s ease-in-out infinite; }
+
+/* ── 카드 그리드 모바일 반응형 ── */
+@media (max-width: 767.98px) {
+  #gridContainer .col-md-6,
+  #gridContainer .col-lg-4 {
+    flex: 0 0 auto;
+    width: 100%;
+  }
+}
 </style>
 </th:block>
 
@@ -142,14 +158,14 @@
     </h4>
     <div class="d-flex align-items-center gap-2">
         <!-- 뷰 토글 -->
-        <div class="btn-group btn-group-sm" role="group">
-            <button type="button" id="btnCalendar" class="btn btn-primary"
+        <div class="btn-group btn-group-sm" role="group" aria-label="View toggle">
+            <button type="button" id="calendarViewBtn" class="btn btn-outline-primary active"
                     onclick="switchView('calendar')">
-                <i class="bi bi-calendar3"></i> 달력
+                <i class="bi bi-calendar3"></i> 캘린더
             </button>
-            <button type="button" id="btnList" class="btn btn-outline-secondary"
-                    onclick="switchView('list')">
-                <i class="bi bi-list-ul"></i> 목록
+            <button type="button" id="gridViewBtn" class="btn btn-outline-primary"
+                    onclick="switchView('grid')">
+                <i class="bi bi-grid-3x3"></i> 카드 그리드
             </button>
         </div>
         <!-- 관리자 크롤링 -->
@@ -194,13 +210,13 @@
     </div>
 </div>
 
-<!-- ── 달력 뷰 ── -->
-<div id="calendarView">
+<!-- ── 캘린더 뷰 ── -->
+<div id="calendarContainer">
     <div id="calendar"></div>
 </div>
 
-<!-- ── 목록 뷰 ── -->
-<div id="listView" style="display:none;">
+<!-- ── 카드 그리드 뷰 ── -->
+<div id="gridContainer" style="display:none;">
 
     <!-- 월 네비게이션 -->
     <div class="d-flex align-items-center gap-2 mb-3">
@@ -301,18 +317,18 @@
             </div>
         </div>
     </div>
-</div><!-- /listView -->
+</div><!-- /gridContainer -->
 
-<!-- ── 이벤트 클릭 모달 ── -->
-<div class="modal fade" id="gameModal" tabindex="-1" aria-labelledby="gameModalTitle" aria-hidden="true">
+<!-- ── 경기 상세 모달 ── -->
+<div class="modal fade" id="gameDetailModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
-            <div class="modal-header py-2">
-                <h6 class="modal-title" id="gameModalTitle">경기 정보</h6>
-                <button type="button" class="btn-close btn-sm" data-bs-dismiss="modal" aria-label="닫기"></button>
+            <div class="modal-header" id="gdmHeader">
+                <h6 class="modal-title text-white" id="gdmTitle">경기 상세</h6>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="닫기"></button>
             </div>
-            <div class="modal-body" id="gameModalBody"></div>
-            <div class="modal-footer py-2" id="gameModalFooter">
+            <div class="modal-body" id="gdmBody"></div>
+            <div class="modal-footer py-2" id="gdmFooter">
                 <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">닫기</button>
             </div>
         </div>
@@ -323,11 +339,13 @@
 
 <!-- ── JS ── -->
 <th:block th:fragment="game-list-script">
-<script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.js"></script>
+<script src='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.15/index.global.min.js'></script>
+<script src='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.15/locales/ko.global.min.js'></script>
 <script th:inline="javascript">
 (function () {
-    var initialTeam = /*[[${selectedTeam}]]*/ 'ALL';
-    var currentTeam = initialTeam;
+    var initialTeam    = /*[[${selectedTeam}]]*/ 'ALL';
+    var selectedMonth  = /*[[${selectedMonth}]]*/ '';
+    var currentTeam    = initialTeam;
     var calendar;
 
     /* ── 팀 컬러 매핑 ── */
@@ -396,132 +414,189 @@
         return '<div class="game-row">' + awayBadge + middleHtml + homeBadge + '</div>';
     }
 
-    /* ── 모달 표시 ── */
-    function showGameModal(info) {
-        var p   = info.event.extendedProps;
-        var gid = p.id || info.event.id;
-        var dt  = info.event.start;
-        var dateStr = dt ? (dt.getFullYear() + '년 ' + (dt.getMonth() + 1) + '월 ' + dt.getDate() + '일') : '';
+    /* ── 경기 상세 모달 ── */
+    var STATUS_COLOR = {
+        FINISHED:    '#6c757d',
+        SCHEDULED:   '#0d6efd',
+        IN_PROGRESS: '#198754',
+        CANCELED:    '#dc3545',
+        POSTPONED:   '#6c757d'
+    };
+    var STATUS_KO = {
+        FINISHED:    '경기 종료',
+        SCHEDULED:   '예정',
+        IN_PROGRESS: '경기 중',
+        CANCELED:    '취소',
+        POSTPONED:   '연기'
+    };
+    var DAY_KO = ['일', '월', '화', '수', '목', '금', '토'];
+
+    function showGameDetailModal(event) {
+        var p       = event.extendedProps;
+        var id      = event.id;
+        var dt      = event.start;
         var timeStr = p.gameTime ? p.gameTime.substring(0, 5) : '';
+
+        var dateLabel = dt
+            ? (dt.getMonth() + 1) + '월 ' + dt.getDate() + '일 (' + DAY_KO[dt.getDay()] + ')'
+            : '';
+
+        /* 헤더 배경색 + 제목 */
+        var headerColor = STATUS_COLOR[p.status] || '#6c757d';
+        var header = document.getElementById('gdmHeader');
+        header.style.backgroundColor = headerColor;
+        header.style.borderColor     = headerColor;
+        document.getElementById('gdmTitle').textContent = dateLabel + ' 경기 상세';
 
         var aC = TEAM_COLORS[p.awayTeam] || '#666';
         var hC = TEAM_COLORS[p.homeTeam] || '#666';
+        var baseTeamSt = 'font-size:1.1rem;font-weight:700;padding:6px 14px;border-radius:8px;display:inline-block;min-width:56px;text-align:center;';
 
-        var statusMap = {
-            SCHEDULED: '예정', IN_PROGRESS: '진행중', FINISHED: '종료',
-            POSTPONED: '연기', CANCELED: '취소'
-        };
-        var badgeClsMap = {
-            SCHEDULED: 'bg-primary', IN_PROGRESS: 'bg-warning text-dark',
-            FINISHED: 'bg-success', POSTPONED: 'bg-secondary', CANCELED: 'bg-danger'
-        };
+        /* 스코어 섹션 */
+        var scoreHtml;
+        var isScored = (p.status === 'FINISHED' || p.status === 'IN_PROGRESS')
+                       && p.awayScore != null && p.homeScore != null;
 
-        var statusLabel = statusMap[p.status] || p.status;
-        var badgeCls    = badgeClsMap[p.status] || 'bg-secondary';
-
-        /* 배지 스타일 + 점수/시간 */
-        var awayStyle, homeStyle, centerHtml;
-
-        if (p.status === 'FINISHED' && p.awayScore != null && p.homeScore != null) {
+        if (isScored) {
             var as = parseInt(p.awayScore, 10);
             var hs = parseInt(p.homeScore, 10);
-            if (as > hs) {
-                awayStyle   = 'background:' + aC + ';color:#fff;';
-                homeStyle   = 'background:#fff;color:' + hC + ';border:2px solid ' + hC + ';opacity:0.6;';
-                centerHtml  = '<div class="fw-bold fs-3 text-center lh-1">' +
-                              '<span style="color:#E24B4A;">' + as + '</span>' +
-                              '<span class="mx-1 text-muted fs-5">-</span>' +
-                              '<span style="color:#888;">' + hs + '</span></div>';
-            } else if (hs > as) {
-                awayStyle   = 'background:#fff;color:' + aC + ';border:2px solid ' + aC + ';opacity:0.6;';
-                homeStyle   = 'background:' + hC + ';color:#fff;';
-                centerHtml  = '<div class="fw-bold fs-3 text-center lh-1">' +
-                              '<span style="color:#888;">' + as + '</span>' +
-                              '<span class="mx-1 text-muted fs-5">-</span>' +
-                              '<span style="color:#E24B4A;">' + hs + '</span></div>';
-            } else {
-                awayStyle   = 'background:' + aC + ';color:#fff;';
-                homeStyle   = 'background:' + hC + ';color:#fff;';
-                centerHtml  = '<div class="fw-bold fs-3 text-center text-dark lh-1">' + as + ' - ' + hs + '</div>';
-            }
-            centerHtml += '<div class="text-center text-muted small mt-1">' + dateStr + '</div>';
+            var awayWin = as > hs, homeWin = hs > as;
+
+            var aSt = awayWin ? baseTeamSt + 'background:' + aC + ';color:#fff;'
+                    : homeWin ? baseTeamSt + 'background:#f8f9fa;color:' + aC + ';border:2px solid ' + aC + ';opacity:0.65;'
+                    :           baseTeamSt + 'background:' + aC + ';color:#fff;';
+            var hSt = homeWin ? baseTeamSt + 'background:' + hC + ';color:#fff;'
+                    : awayWin  ? baseTeamSt + 'background:#f8f9fa;color:' + hC + ';border:2px solid ' + hC + ';opacity:0.65;'
+                    :            baseTeamSt + 'background:' + hC + ';color:#fff;';
+
+            var aSc = awayWin ? 'color:#E24B4A;font-weight:700;' : homeWin ? 'color:#aaa;' : 'color:#333;';
+            var hSc = homeWin ? 'color:#E24B4A;font-weight:700;' : awayWin ? 'color:#aaa;' : 'color:#333;';
+
+            var liveTag = p.status === 'IN_PROGRESS'
+                ? '<div class="mt-1"><span class="badge bg-success badge-live-blink">LIVE</span></div>' : '';
+
+            scoreHtml =
+                '<div class="d-flex align-items-center justify-content-center gap-3 py-3">' +
+                '  <div class="text-center">' +
+                '    <div style="' + aSt + '">' + (p.awayTeam || '') + '</div>' +
+                '    <div class="small text-muted mt-1">원정</div>' +
+                '  </div>' +
+                '  <div class="text-center">' +
+                '    <div style="font-size:2.2rem;font-weight:700;line-height:1;">' +
+                '      <span style="' + aSc + '">' + as + '</span>' +
+                '      <span class="text-muted mx-1" style="font-size:1.3rem;">:</span>' +
+                '      <span style="' + hSc + '">' + hs + '</span>' +
+                '    </div>' + liveTag +
+                '  </div>' +
+                '  <div class="text-center">' +
+                '    <div style="' + hSt + '">' + (p.homeTeam || '') + '</div>' +
+                '    <div class="small text-muted mt-1">홈</div>' +
+                '  </div>' +
+                '</div>';
         } else {
-            awayStyle  = 'background:#fff;color:' + aC + ';border:2px solid ' + aC + ';';
-            homeStyle  = 'background:#fff;color:' + hC + ';border:2px solid ' + hC + ';';
-            centerHtml = timeStr
-                ? '<div class="fw-bold fs-4 text-center text-dark lh-1">' + timeStr + '</div>' +
-                  '<div class="text-center text-muted small mt-1">' + dateStr + '</div>'
-                : '<div class="text-center text-muted small">' + dateStr + '</div>';
+            var subText = p.status === 'CANCELED'  ? '경기 취소'
+                        : p.status === 'POSTPONED' ? '경기 연기'
+                        :                            '경기 시작 전';
+            var aSt2 = baseTeamSt + 'background:#f8f9fa;color:' + aC + ';border:2px solid ' + aC + ';';
+            var hSt2 = baseTeamSt + 'background:#f8f9fa;color:' + hC + ';border:2px solid ' + hC + ';';
+            scoreHtml =
+                '<div class="d-flex align-items-center justify-content-center gap-3 py-3">' +
+                '  <div class="text-center">' +
+                '    <div style="' + aSt2 + '">' + (p.awayTeam || '') + '</div>' +
+                '    <div class="small text-muted mt-1">원정</div>' +
+                '  </div>' +
+                '  <div class="text-center">' +
+                '    <div class="fw-bold fs-4 text-muted">vs</div>' +
+                '    <div class="small text-muted mt-1">' + subText + '</div>' +
+                '  </div>' +
+                '  <div class="text-center">' +
+                '    <div style="' + hSt2 + '">' + (p.homeTeam || '') + '</div>' +
+                '    <div class="small text-muted mt-1">홈</div>' +
+                '  </div>' +
+                '</div>';
         }
 
-        var baseBadgeStyle = 'border-radius:10px;padding:4px 8px;font-weight:600;font-size:14px;min-width:52px;text-align:center;display:inline-block;';
-        var awayBadgeHtml  = '<div style="' + awayStyle + baseBadgeStyle + '">' + (p.awayTeam || '') + '</div>';
-        var homeBadgeHtml  = '<div style="' + homeStyle  + baseBadgeStyle + '">' + (p.homeTeam  || '') + '</div>';
+        /* 정보 테이블 */
+        var dtStr = dt
+            ? (dt.getMonth() + 1) + '/' + dt.getDate() + ' (' + DAY_KO[dt.getDay()] + ')' + (timeStr ? ' ' + timeStr : '')
+            : '';
+        var stadiumStr = (p.stadium && p.stadium !== '-') ? p.stadium : '-';
+        var infoHtml =
+            '<table class="table table-sm table-borderless small mb-0">' +
+            '  <tbody>' +
+            '    <tr><th class="text-muted fw-normal ps-0" style="width:60px;">일시</th><td>' + dtStr + '</td></tr>' +
+            '    <tr><th class="text-muted fw-normal ps-0">경기장</th><td>' + stadiumStr + '</td></tr>' +
+            '    <tr><th class="text-muted fw-normal ps-0">상태</th><td>' + (STATUS_KO[p.status] || p.status) + '</td></tr>' +
+            '  </tbody>' +
+            '</table>';
 
-        document.getElementById('gameModalTitle').textContent =
-            (p.awayTeam || '') + ' vs ' + (p.homeTeam || '');
+        document.getElementById('gdmBody').innerHTML = scoreHtml + infoHtml;
 
-        document.getElementById('gameModalBody').innerHTML =
-            '<div class="d-flex justify-content-between align-items-center mb-3">' +
-            '  <span class="badge ' + badgeCls + '">' + statusLabel + '</span>' +
-            '  <small class="text-muted">' + (p.stadium && p.stadium !== '-' ? p.stadium : '') + '</small>' +
-            '</div>' +
-            '<div class="d-flex align-items-center justify-content-around py-2">' +
-            '  <div class="text-center">' + awayBadgeHtml + '<div class="small text-muted mt-1">원정</div></div>' +
-            '  <div>' + centerHtml + '</div>' +
-            '  <div class="text-center">' + homeBadgeHtml + '<div class="small text-muted mt-1">홈</div></div>' +
-            '</div>';
+        /* 푸터 */
+        var footerHtml = p.status === 'FINISHED'
+            ? '<a href="/games/' + id + '" class="btn btn-primary btn-sm">박스스코어 보기</a> '
+            : '';
+        footerHtml += '<button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">닫기</button>';
+        document.getElementById('gdmFooter').innerHTML = footerHtml;
 
-        document.getElementById('gameModalFooter').innerHTML =
-            '<a href="/games/' + gid + '" class="btn btn-outline-primary btn-sm">경기 상세 보기 →</a>' +
-            '<button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">닫기</button>';
-
-        new bootstrap.Modal(document.getElementById('gameModal')).show();
+        new bootstrap.Modal(document.getElementById('gameDetailModal')).show();
     }
 
-    /* ── 뷰 전환 ── */
+    /* ── 뷰 전환 + localStorage 저장 ── */
     window.switchView = function (view) {
-        var calView = document.getElementById('calendarView');
-        var lstView = document.getElementById('listView');
-        var btnCal  = document.getElementById('btnCalendar');
-        var btnLst  = document.getElementById('btnList');
+        var calEl  = document.getElementById('calendarContainer');
+        var gridEl = document.getElementById('gridContainer');
+        var btnCal = document.getElementById('calendarViewBtn');
+        var btnGrd = document.getElementById('gridViewBtn');
         if (view === 'calendar') {
-            calView.style.display = '';
-            lstView.style.display = 'none';
-            btnCal.classList.replace('btn-outline-secondary', 'btn-primary');
-            btnLst.classList.replace('btn-primary', 'btn-outline-secondary');
+            calEl.style.display  = '';
+            gridEl.style.display = 'none';
+            btnCal.classList.add('active');
+            btnGrd.classList.remove('active');
             if (calendar) calendar.updateSize();
         } else {
-            calView.style.display = 'none';
-            lstView.style.display = '';
-            btnCal.classList.replace('btn-primary', 'btn-outline-secondary');
-            btnLst.classList.replace('btn-outline-secondary', 'btn-primary');
+            calEl.style.display  = 'none';
+            gridEl.style.display = '';
+            btnCal.classList.remove('active');
+            btnGrd.classList.add('active');
         }
+        try { localStorage.setItem('schedulePreferredView', view); } catch(e) {}
     };
 
     /* ── 팀 필터 변경 ── */
     window.onTeamChange = function (val) {
         currentTeam = val;
-        if (calendar) calendar.refetchEvents();
+        var gridEl = document.getElementById('gridContainer');
+        if (gridEl && gridEl.style.display !== 'none') {
+            /* 카드 그리드: 서버 필터 적용을 위해 페이지 리로드 */
+            var url = '/games?team=' + encodeURIComponent(val);
+            if (selectedMonth) url += '&month=' + selectedMonth;
+            window.location.href = url;
+        } else {
+            /* 캘린더: 이벤트 재조회 */
+            if (calendar) calendar.refetchEvents();
+        }
     };
 
     /* ── FullCalendar 초기화 ── */
     document.addEventListener('DOMContentLoaded', function () {
         var calEl = document.getElementById('calendar');
+        var isMobile = window.innerWidth < 768;
         calendar = new FullCalendar.Calendar(calEl, {
             locale: 'ko',
-            initialView: 'dayGridMonth',
+            initialView: isMobile ? 'listWeek' : 'dayGridMonth',
             headerToolbar: {
                 left:   'prev,next today',
                 center: 'title',
-                right:  'dayGridMonth,listMonth'
+                right:  'dayGridMonth,listWeek'
             },
             buttonText: {
-                today:     '오늘',
-                month:     '월',
-                listMonth: '목록'
+                today:    '오늘',
+                month:    '월',
+                listWeek: '주목록'
             },
             height: 'auto',
+            eventDisplay: 'block',
             events: function (fetchInfo, successCallback, failureCallback) {
                 var url = '/games/api/events' +
                           '?start=' + fetchInfo.startStr.substring(0, 10) +
@@ -538,9 +613,28 @@
                 wrap.innerHTML = renderGameRow(arg.event.extendedProps);
                 return { domNodes: [wrap.firstElementChild] };
             },
-            eventClick: showGameModal
+            eventClick: function (info) {
+                info.jsEvent.preventDefault();
+                showGameDetailModal(info.event);
+            }
         });
         calendar.render();
+
+        /* 저장된 뷰 복원 */
+        try {
+            var savedView = localStorage.getItem('schedulePreferredView');
+            if (savedView === 'grid') switchView('grid');
+        } catch(e) {}
+
+        /* 768px 미만 → listWeek, 이상 → dayGridMonth 자동 전환 */
+        var lastMobile = isMobile;
+        window.addEventListener('resize', function () {
+            var nowMobile = window.innerWidth < 768;
+            if (nowMobile !== lastMobile) {
+                lastMobile = nowMobile;
+                calendar.changeView(nowMobile ? 'listWeek' : 'dayGridMonth');
+            }
+        });
     });
 })();
 </script>

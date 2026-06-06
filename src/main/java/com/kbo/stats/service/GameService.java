@@ -10,6 +10,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -85,47 +87,59 @@ public class GameService {
 
         switch (game.getStatus()) {
             case FINISHED:
-                title = String.format("%s %d-%d %s",
+                title = String.format("%s %d : %d %s",
                         game.getAwayTeam(), game.getAwayScore(),
                         game.getHomeScore(), game.getHomeTeam());
                 color = "#6c757d";
                 break;
             case IN_PROGRESS:
-                title = String.format("🔴 %s vs %s", game.getAwayTeam(), game.getHomeTeam());
-                color = "#dc3545";
+                if (game.getAwayScore() != null && game.getHomeScore() != null) {
+                    title = String.format("%s %d : %d %s",
+                            game.getAwayTeam(), game.getAwayScore(),
+                            game.getHomeScore(), game.getHomeTeam());
+                } else {
+                    title = String.format("%s vs %s", game.getAwayTeam(), game.getHomeTeam());
+                }
+                color = "#198754";
                 break;
             case CANCELED:
+                title = String.format("%s vs %s", game.getAwayTeam(), game.getHomeTeam());
+                color = "#dc3545";
+                break;
             case POSTPONED:
-                title = String.format("취소: %s vs %s", game.getAwayTeam(), game.getHomeTeam());
-                color = "#adb5bd";
+                title = String.format("%s vs %s", game.getAwayTeam(), game.getHomeTeam());
+                color = "#6c757d";
                 break;
             default: // SCHEDULED
-                title = String.format("%s vs %s%s",
-                        game.getAwayTeam(), game.getHomeTeam(),
-                        game.getGameTime() != null
-                                ? " (" + game.getGameTime().toString().substring(0, 5) + ")" : "");
+                title = String.format("%s vs %s", game.getAwayTeam(), game.getHomeTeam());
                 color = "#0d6efd";
         }
 
-        String startStr = game.getGameDate().toString();
+        String startStr;
+        String endStr = null;
         if (game.getGameTime() != null) {
-            startStr = startStr + "T" + game.getGameTime();
+            LocalDateTime startDt = LocalDateTime.of(game.getGameDate(), game.getGameTime());
+            startStr = startDt.format(DateTimeFormatter.ISO_LOCAL_DATE_TIME);
+            endStr   = startDt.plusHours(3).format(DateTimeFormatter.ISO_LOCAL_DATE_TIME);
+        } else {
+            startStr = game.getGameDate().toString();
         }
 
         Map<String, Object> props = new HashMap<>();
-        props.put("id", game.getId());
-        props.put("awayTeam", game.getAwayTeam());
-        props.put("homeTeam", game.getHomeTeam());
+        props.put("awayTeam",  game.getAwayTeam());
+        props.put("homeTeam",  game.getHomeTeam());
         props.put("awayScore", game.getAwayScore());
         props.put("homeScore", game.getHomeScore());
-        props.put("status", game.getStatus().name());
-        props.put("stadium", game.getStadium());
-        props.put("gameTime", game.getGameTime() != null ? game.getGameTime().toString() : null);
+        props.put("status",    game.getStatus().name());
+        props.put("stadium",   game.getStadium());
+        props.put("gameTime",  game.getGameTime() != null ? game.getGameTime().toString() : null);
+        props.put("kboGameId", game.getKboGameId());
 
         return CalendarEventDto.builder()
                 .id(game.getId())
                 .title(title)
                 .start(startStr)
+                .end(endStr)
                 .backgroundColor(color)
                 .borderColor(color)
                 .extendedProps(props)
