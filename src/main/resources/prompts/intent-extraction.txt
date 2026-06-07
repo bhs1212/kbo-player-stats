@@ -4,27 +4,109 @@
 
 출력 형식:
 {
+  "intentType": "PLAYER_STATS" | "SCHEDULE_QUERY" | "RANKING" | "PLAYER_LIST" | null,
+  "startDate": "yyyy-MM-dd" | null,
+  "endDate": "yyyy-MM-dd" | null,
   "playerType": "BATTER" | "PITCHER" | null,
   "team": string | null (예: "한화", "두산", "삼성", "LG", "KT", "NC", "롯데", "SSG", "키움", "KIA"),
   "playerName": string | null,
   "sortBy": "homeRuns" | "battingAvg" | "rbi" | "stolenBases" | "era" | "wins" | "saves" | "holds" | null,
+  "statField": "homeRuns" | "battingAvg" | "rbi" | "stolenBases" | "era" | "wins" | "saves" | "holds" | null,
   "limit": number (기본값 5)
 }
 
-예시:
-Q: "올해 한화 타자 중 홈런 잘 친 선수?"
-A: {"playerType":"BATTER","team":"한화","playerName":null,"sortBy":"homeRuns","limit":5}
+intentType 분류 규칙:
+- SCHEDULE_QUERY: "경기", "일정", "결과", "스케줄", "언제", "다음 경기", "최근 경기" + 날짜 표현 조합
+- PLAYER_STATS: 특정 선수 이름 + 통계 키워드 또는 "어때?"
+- RANKING: "1위", "TOP", "순위", "랭킹", "제일", "가장" + 통계 키워드
+- PLAYER_LIST: 팀명만 있거나 "선수들", "누구" 같은 목록 요청
 
-Q: "이정후 기록 어때?"
-A: {"playerType":null,"team":null,"playerName":"이정후","sortBy":null,"limit":1}
+팀명 동의어 (모두 같은 팀):
+- KIA: 기아, 타이거즈, KIA 타이거즈
+- 한화: 이글스, 한화 이글스
+- LG: 엘지, 트윈스, LG 트윈스
+- 두산: 베어스, 두산 베어스
+- 삼성: 라이온즈, 삼성 라이온즈
+- 롯데: 자이언츠, 롯데 자이언츠
+- SSG: 랜더스, 쓱, SSG 랜더스
+- NC: 다이노스, 엔씨, NC 다이노스
+- KT: 위즈, 케이티, KT 위즈
+- 키움: 히어로즈, 키움 히어로즈
+
+통계 키워드 매핑:
+- homeRuns: 홈런, 아치, 솔로, 투런
+- battingAvg: 타율, 타격률
+- rbi: 타점, RBI
+- stolenBases: 도루, 스틸
+- era: 방어율, ERA, 평균자책점
+- wins: 승리, 승수, 다승
+- saves: 세이브, 마무리
+- holds: 홀드, 중간계투
+
+상대 날짜 → startDate/endDate 변환 규칙 (시간 컨텍스트에 명시된 절대 날짜를 직접 사용, 직접 계산하지 말 것):
+
+| 표현 | startDate | endDate |
+|------|-----------|---------|
+| 오늘 | "오늘" | 같음 |
+| 어제 | "어제" | 같음 |
+| 내일 | "내일" | 같음 |
+| 이번 주 | "이번 주 월요일" | "이번 주 일요일" |
+| 지난주 / 지난 주 | "지난 주 월요일" | "지난 주 일요일" |
+| 다음 주 | "이번 주 일요일"+1일 | 그+6일 |
+| 이번 주말 | "이번 주 토요일" | "이번 주 일요일" |
+| 지난 주말 | "지난 주 토요일" | "지난 주 일요일" |
+| 이번 달 | "이번 달 1일" | "이번 달 말일" |
+| 다음 경기 / 다음 일정 | "오늘" | "오늘"+14일 |
+| 최근 / 최근 경기 | "오늘"-7일 | "오늘" |
+
+주의:
+- 한국 캘린더 기준: 주는 월요일 시작, 일요일 끝
+- "지난주"는 절대 "이번 주 ~7일 전" 이 아님. 직전 월~일 주를 사용
+- 시간 컨텍스트에 "이번 주 토요일", "지난 주 토요일" 이 명시되어 있으므로 그 값을 그대로 사용
+
+핵심 규칙:
+- SCHEDULE_QUERY이면 상대 날짜를 반드시 절대 날짜로 변환하여 startDate/endDate를 채울 것
+- playerName이 있으면 sortBy는 null, statField로 강조할 통계만 표시
+- "박민우 어때?" → playerName만, statField/sortBy 모두 null (전체 통계)
+- "박민우 도루" → playerName + statField="stolenBases", sortBy=null
+- "도루 1위" → sortBy="stolenBases", playerName=null
+
+예시 (시간 컨텍스트: 오늘=2026-06-07(토), 어제=2026-06-06, 내일=2026-06-08, 이번 주=2026-06-01~2026-06-07, 이번 주 토요일=2026-06-07, 지난주=2026-05-25~2026-05-31, 지난 주 토요일=2026-05-31):
+
+Q: "어제 경기 알려줘"
+A: {"intentType":"SCHEDULE_QUERY","startDate":"2026-06-06","endDate":"2026-06-06","team":null,"playerType":null,"playerName":null,"sortBy":null,"statField":null,"limit":10}
+
+Q: "내일 경기"
+A: {"intentType":"SCHEDULE_QUERY","startDate":"2026-06-08","endDate":"2026-06-08","team":null,"playerType":null,"playerName":null,"sortBy":null,"statField":null,"limit":10}
+
+Q: "지난 주말 두산 경기"
+A: {"intentType":"SCHEDULE_QUERY","startDate":"2026-05-30","endDate":"2026-05-31","team":"두산","playerType":null,"playerName":null,"sortBy":null,"statField":null,"limit":10}
+
+Q: "이번 주말 KIA 경기"
+A: {"intentType":"SCHEDULE_QUERY","startDate":"2026-06-06","endDate":"2026-06-07","team":"KIA","playerType":null,"playerName":null,"sortBy":null,"statField":null,"limit":10}
+
+Q: "지난주 두산 결과"
+A: {"intentType":"SCHEDULE_QUERY","startDate":"2026-05-25","endDate":"2026-05-31","team":"두산","playerType":null,"playerName":null,"sortBy":null,"statField":null,"limit":10}
+
+Q: "트윈스 다음 경기"
+A: {"intentType":"SCHEDULE_QUERY","startDate":"2026-06-07","endDate":"2026-06-21","team":"LG","playerType":null,"playerName":null,"sortBy":null,"statField":null,"limit":5}
+
+Q: "박민우 어때?"
+A: {"intentType":"PLAYER_STATS","startDate":null,"endDate":null,"playerType":"BATTER","team":"NC","playerName":"박민우","sortBy":null,"statField":null,"limit":1}
+
+Q: "박민우 도루 몇 개?"
+A: {"intentType":"PLAYER_STATS","startDate":null,"endDate":null,"playerType":"BATTER","team":"NC","playerName":"박민우","sortBy":null,"statField":"stolenBases","limit":1}
+
+Q: "홈런 1위"
+A: {"intentType":"RANKING","startDate":null,"endDate":null,"playerType":"BATTER","team":null,"playerName":null,"sortBy":"homeRuns","statField":null,"limit":1}
+
+Q: "올해 한화 타자 중 홈런 잘 친 선수?"
+A: {"intentType":"RANKING","startDate":null,"endDate":null,"playerType":"BATTER","team":"한화","playerName":null,"sortBy":"homeRuns","statField":null,"limit":5}
 
 Q: "방어율 좋은 투수 3명만"
-A: {"playerType":"PITCHER","team":null,"playerName":null,"sortBy":"era","limit":3}
+A: {"intentType":"RANKING","startDate":null,"endDate":null,"playerType":"PITCHER","team":null,"playerName":null,"sortBy":"era","statField":null,"limit":3}
 
 Q: "삼성 선수 누구 있어?"
-A: {"playerType":null,"team":"삼성","playerName":null,"sortBy":null,"limit":10}
-
-Q: "타점 TOP5 알려줘"
-A: {"playerType":"BATTER","team":null,"playerName":null,"sortBy":"rbi","limit":5}
+A: {"intentType":"PLAYER_LIST","startDate":null,"endDate":null,"playerType":null,"team":"삼성","playerName":null,"sortBy":null,"statField":null,"limit":10}
 
 JSON만 출력하고 추가 설명이나 마크다운 코드블록은 포함하지 마세요.
